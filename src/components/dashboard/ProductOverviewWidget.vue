@@ -2,31 +2,40 @@
 import useQuotes from '@/composables/useQuotes'
 import { formatCurrency, formatDate } from '@/utils/common'
 import { Column, DataTable, Tag } from 'primevue'
-import { Priority, Currency, ApprovedBy, QuoteStatus } from '@/utils/interfaces'
+import { Currency, ApprovedBy, QuoteStatus } from '@/utils/interfaces'
 
 const { quotes, editingRows, itemsColumns, expandedRows, updateQuote, getSeverity } = useQuotes()
 </script>
 <template>
-  <DataTable
-    v-model:expanded-rows="expandedRows"
-    v-model:editingRows="editingRows"
-    @row-edit-save="updateQuote"
-    editMode="row"
-    :value="quotes"
-    data-key="id"
-    tableStyle="min-width: 250rem"
-  >
-    <Column rowEditor style="width: 5rem" bodyStyle="text-align:center" />
-    <Column expander style="width: 5rem" header="Items" />
+  <div class="card">
+    <DataTable
+      v-model:expanded-rows="expandedRows"
+      v-model:editingRows="editingRows"
+      :value="quotes"
+      editMode="row"
+      data-key="id"
+      @row-edit-save="updateQuote"
+      tableStyle="min-width: 220rem"
+      :pt="{
+        column: {
+          bodycell: ({ state }: any) => ({
+            style: state['d_editing'] && 'padding-top: 0.75rem; padding-bottom: 0.75rem',
+          }),
+        },
+      }"
+    >
+      <Column rowEditor style="width: 5rem" bodyStyle="text-align:center" />
+      <Column expander style="width: 5rem" header="Items" />
 
-    <!-- Columnas -->
-    <fieldset>
       <Column field="priority" header="Priority">
         <template #body="slotProps">
           <Tag :value="slotProps.data.priority" :severity="getSeverity(slotProps.data.priority)" />
         </template>
+      </Column>
+
+      <Column field="id" header="Consecutive">
         <template #editor="{ data, field }">
-          <Dropdown v-model="data[field]" :options="Object.values(Priority)" />
+          <InputText v-model="data[field]" fluid />
         </template>
       </Column>
 
@@ -40,40 +49,32 @@ const { quotes, editingRows, itemsColumns, expandedRows, updateQuote, getSeverit
         <template #body="slotProps">
           {{ formatCurrency(slotProps.data.totalPrice) }}
         </template>
-        <template #editor="{ data, field }">
-          <InputNumber
-            v-model="data[field]"
-            mode="currency"
-            :currency="data.currency"
-            locale="es-CO"
-          />
-        </template>
       </Column>
 
       <Column field="expireDate" header="Expire Date">
-        <template #body="slotProps">
-          {{ formatDate(slotProps.data.expireDate) }}
-        </template>
         <template #editor="{ data, field }">
           <Calendar v-model="data[field]" showIcon />
+        </template>
+        <template #body="slotProps">
+          {{ formatDate(slotProps.data.expireDate) }}
         </template>
       </Column>
 
       <Column field="deliveryDate" header="Delivery Date">
-        <template #body="slotProps">
-          {{ formatDate(slotProps.data.deliveryDate) }}
-        </template>
         <template #editor="{ data, field }">
           <Calendar v-model="data[field]" showIcon />
+        </template>
+        <template #body="slotProps">
+          {{ formatDate(slotProps.data.deliveryDate) }}
         </template>
       </Column>
 
       <Column field="status" header="Status">
-        <template #body="slotProps">
-          <Tag :value="slotProps.data.status" :severity="getSeverity(slotProps.data.status)" />
-        </template>
         <template #editor="{ data, field }">
           <Dropdown v-model="data[field]" :options="Object.values(QuoteStatus)" />
+        </template>
+        <template #body="slotProps">
+          <Tag :value="slotProps.data.status" :severity="getSeverity(slotProps.data.status)" />
         </template>
       </Column>
 
@@ -111,26 +112,23 @@ const { quotes, editingRows, itemsColumns, expandedRows, updateQuote, getSeverit
             }"
           ></i>
         </template>
-        <template #editor="{ data, field }">
-          <Checkbox v-model="data[field]" />
-        </template>
       </Column>
-    </fieldset>
 
-    <template #expansion="slotProps">
-      <div class="p-3">
-        <h5>
-          Items of <span class="font-bold">{{ slotProps.data.id }}</span>
-        </h5>
-        <DataTable :value="slotProps.data.items" striped-rows table-style="width: 70rem">
-          <Column
-            v-for="col of itemsColumns"
-            :key="col.field"
-            :field="col.field"
-            :header="col.header"
-          ></Column>
-        </DataTable>
-      </div>
-    </template>
-  </DataTable>
+      <template #expansion="slotProps">
+        <div class="p-3">
+          <h5>
+            Items of <span class="font-bold">{{ slotProps.data.id }}</span>
+          </h5>
+          <DataTable :value="slotProps.data.items" striped-rows table-style="width: 70rem">
+            <Column
+              v-for="col of itemsColumns"
+              :key="col.field"
+              :field="col.field"
+              :header="col.header"
+            ></Column>
+          </DataTable>
+        </div>
+      </template>
+    </DataTable>
+  </div>
 </template>

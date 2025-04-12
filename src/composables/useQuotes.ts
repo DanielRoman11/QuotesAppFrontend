@@ -1,9 +1,11 @@
 import axios from 'axios'
-import { onMounted, ref } from 'vue'
+import { useToast } from 'primevue'
+import { onMounted, ref, watch } from 'vue'
 
 export default function useProduct() {
+  const toast = useToast()
   const quotes = ref([])
-  const editingRows = ref({})
+  const editingRows = ref([])
   const expandedRows = ref({})
   const itemsColumns = ref([
     { field: 'id', header: 'Id' },
@@ -25,10 +27,23 @@ export default function useProduct() {
     const { newData } = event
     console.log(newData)
     try {
-      await axios.put(`http://localhost:3000/quote/${newData.id}`, newData)
+      await axios.patch(`http://localhost:3000/quote/${newData.id}`, newData)
       console.log('Datos actualizados:', newData)
+
+      toast.add({
+        severity: 'success',
+        summary: 'Actualizado',
+        detail: 'Los datos se actualizaron correctamente',
+        life: 3000,
+      })
     } catch (error) {
       console.error('Error al actualizar:', error)
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Error al actualizar los datos',
+        life: 3000,
+      })
     }
   }
 
@@ -57,6 +72,9 @@ export default function useProduct() {
   }
 
   onMounted(getQuotes)
+  watch(editingRows, () => {
+    console.log(editingRows)
+  })
 
   return {
     quotes,
