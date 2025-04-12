@@ -2,17 +2,15 @@ import { updatePrimaryPalette, updateSurfacePalette } from '@primeuix/themes'
 import { computed, ref } from 'vue'
 import { primaryColors, surfaces } from './theme'
 
-
 const STORAGE_KEY = 'themeSettings'
 const savedState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')
 
 const appState = ref({
-  primary: savedState.primary || 'emerald',
+  primary: savedState.primary || 'blue',
   surface: savedState.surface || null,
   darkMode: savedState.darkMode ?? false,
 })
 
-// Aplica el modo oscuro si estaba activado
 if (appState.value.darkMode) {
   document.documentElement.classList.add('p-dark')
 }
