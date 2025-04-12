@@ -13,9 +13,3 @@ export enum ApprovedBy {
   technicalManagement = 'JOSE GUILLERMO MORA PINILLA',
   generalManagement = 'CLAUDIA MILENA ROMÁN HENAO',
 }
-
-export enum Priority {
-  high = 'Alta',
-  normal = 'Normal',
-  low = 'Baja',
-}
