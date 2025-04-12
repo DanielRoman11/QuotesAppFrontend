@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import useStats from '@/composables/useStats'
+import { formatCurrency } from '@/utils/common'
 
 const { stats } = useStats()
 </script>
@@ -21,7 +22,9 @@ const { stats } = useStats()
         </span>
       </div>
       <div class="flex flex-col gap-1 w-full">
-        <div class="text-3xl font-medium leading-tight">{{ stat.value }}</div>
+        <div class="text-3xl font-medium leading-tight">
+          {{ stat.title !== 'Revenue' ? stat.value : formatCurrency(stat.value) }}
+        </div>
         <div class="text-surface-600 dark:text-surface-400 text-sm leading-tight">
           {{ stat.subtitle }}
         </div>

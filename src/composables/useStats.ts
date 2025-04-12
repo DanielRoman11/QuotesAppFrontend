@@ -39,7 +39,7 @@ export default function useStats() {
     {
       title: 'Revenue',
       icon: 'pi-dollar',
-      value: `$${revenue.value}`,
+      value: `${revenue.value}`,
       subtitle: 'Last Month',
     },
     {
