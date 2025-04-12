@@ -4,6 +4,7 @@ import Material from '@primeuix/themes/material'
 import PrimeVue from 'primevue/config'
 import { createApp } from 'vue'
 import App from './App.vue'
+import { ToastService } from 'primevue'
 
 const app = createApp(App)
 
@@ -15,5 +16,5 @@ app.use(PrimeVue, {
     },
   },
 })
-
+app.use(ToastService)
 app.mount('#app')

@@ -4,7 +4,7 @@ import AppTopbar from './components/layout/AppTopbar.vue'
 import AppAside from './components/layout/AppAside.vue'
 import StatsWidget from './components/dashboard/StatsWidget.vue'
 import ProductOverviewWidget from './components/dashboard/ProductOverviewWidget.vue'
-import { Divider, ScrollPanel } from 'primevue'
+import { Divider, ScrollPanel, Toast } from 'primevue'
 </script>
 <template>
   <section class="flex h-svh">
@@ -19,4 +19,5 @@ import { Divider, ScrollPanel } from 'primevue'
       <AppFooter />
     </ScrollPanel>
   </section>
+  <Toast position="bottom-right" />
 </template>
