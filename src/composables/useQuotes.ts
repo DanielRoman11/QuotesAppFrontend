@@ -4,19 +4,24 @@ import { onMounted, ref, watch } from 'vue'
 
 export default function useProduct() {
   const toast = useToast()
+  const search = ref<string>('')
   const quotes = ref<any[]>([])
   const editingRows = ref([])
   const expandedRows = ref({})
-  const itemsColumns = ref([
-    { field: 'id', header: 'Id' },
-    { field: 'description', header: 'Description' },
-    { field: 'price', header: 'totalPrice' },
-    { field: 'quantity', header: 'Quantity' },
-  ])
+  const itemsColumns = [
+    { field: 'id', header: 'ID', editable: false },
+    { field: 'description', header: 'Description', editable: false },
+    { field: 'quantity', header: 'Quantity', editable: true },
+    { field: 'price', header: 'Price', editable: true },
+  ]
 
-  async function getQuotes() {
+  async function getQuotes(search: string) {
     try {
-      const response = await axios.get('http://localhost:3000/quote')
+      const response = await axios.get('http://localhost:3000/quote', {
+        params: {
+          search,
+        },
+      })
       quotes.value = response.data
     } catch (err) {
       console.error(err)
@@ -82,12 +87,18 @@ export default function useProduct() {
   }
 
   onMounted(getQuotes)
-  watch(editingRows, () => {
-    console.log(editingRows)
+
+  let debounceTimeout: ReturnType<typeof setTimeout>
+  watch(search, () => {
+    clearTimeout(debounceTimeout)
+    debounceTimeout = setTimeout(() => {
+      search.value.length > 0 && getQuotes(search.value)
+    }, 1500)
   })
 
   return {
     quotes,
+    search,
     editingRows,
     itemsColumns,
     expandedRows,

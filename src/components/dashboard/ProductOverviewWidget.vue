@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import useQuotes from '@/composables/useQuotes'
 import { formatCurrency, formatDate } from '@/utils/common'
-import { Column, DataTable, Tag } from 'primevue'
+import { Column, DataTable, InputNumber, InputText, Tag } from 'primevue'
 import { Currency, ApprovedBy, QuoteStatus } from '@/utils/interfaces'
 
-const { quotes, editingRows, itemsColumns, expandedRows, updateQuote, getSeverity } = useQuotes()
+const { quotes, search, editingRows, expandedRows, updateQuote, getSeverity } = useQuotes()
 </script>
 <template>
   <div class="card">
@@ -16,6 +16,12 @@ const { quotes, editingRows, itemsColumns, expandedRows, updateQuote, getSeverit
       data-key="id"
       @row-edit-save="updateQuote"
       tableStyle="min-width: 220rem"
+      scrollable
+      scrollHeight="400px"
+      rowGroupMode="subheader"
+      groupRowsBy="author"
+      sort-field="author"
+      :sort-order="1"
       :pt="{
         column: {
           bodycell: ({ state }: any) => ({
@@ -24,7 +30,27 @@ const { quotes, editingRows, itemsColumns, expandedRows, updateQuote, getSeverit
         },
       }"
     >
-      <Column rowEditor style="width: 5rem" bodyStyle="text-align:center" />
+      <template #groupheader="slotProps">
+        <div class="flex items-center gap-2 !z-50">
+          <img
+            :alt="`Imagen de ${slotProps.data.author}`"
+            src="https://hidroconsulting.com.co/svg/HidroLogoNoTxt.svg"
+            width="32"
+          />
+          <p class="capitalize font-semibold">
+            {{ slotProps.data.author }}
+          </p>
+        </div>
+      </template>
+      <template #header>
+        <IconField>
+          <InputIcon>
+            <i class="pi pi-search" />
+          </InputIcon>
+          <InputText v-model="search" placeholder="Busqueda Global" />
+        </IconField>
+      </template>
+      <Column rowEditor style="width: 5rem" bodyStyle="text-align:center" :frozen="true" />
       <Column expander style="width: 5rem" header="Items" />
 
       <Column field="priority" header="Priority">
@@ -33,19 +59,14 @@ const { quotes, editingRows, itemsColumns, expandedRows, updateQuote, getSeverit
         </template>
       </Column>
 
-      <Column field="id" header="Consecutive">
-        <template #editor="{ data, field }">
-          <InputText v-model="data[field]" fluid />
-        </template>
-      </Column>
-
+      <Column field="id" header="Consecutive" class="font-bold" :frozen="true" />
       <Column field="currency" header="Currency">
         <template #editor="{ data, field }">
           <Dropdown v-model="data[field]" :options="Object.values(Currency)" />
         </template>
       </Column>
 
-      <Column field="totalPrice" header="Total Price">
+      <Column field="totalPrice" header="Total Price" :frozen="true">
         <template #body="slotProps">
           {{ formatCurrency(slotProps.data.totalPrice) }}
         </template>
@@ -90,6 +111,8 @@ const { quotes, editingRows, itemsColumns, expandedRows, updateQuote, getSeverit
         </template>
       </Column>
 
+      <Column field="client.companyName" header="Company Name"></Column>
+
       <Column field="createdAt" header="Created At">
         <template #body="slotProps">
           {{ formatDate(slotProps.data.createdAt) }}
@@ -116,16 +139,61 @@ const { quotes, editingRows, itemsColumns, expandedRows, updateQuote, getSeverit
 
       <template #expansion="slotProps">
         <div class="p-3">
-          <h5>
-            Items of <span class="font-bold">{{ slotProps.data.id }}</span>
+          <h5 class="text-balance">
+            All Items from
+            <span class="font-bold underline text-primary">{{ slotProps.data.id }}</span>
           </h5>
-          <DataTable :value="slotProps.data.items" striped-rows table-style="width: 70rem">
-            <Column
-              v-for="col of itemsColumns"
-              :key="col.field"
-              :field="col.field"
-              :header="col.header"
-            ></Column>
+          <DataTable
+            :value="slotProps.data.items"
+            rowGroupMode="subheader"
+            groupRowsBy="category"
+            editMode="cell"
+            dataKey="id"
+            tableStyle="width: 70rem"
+            :sortField="'category'"
+            :sortOrder="1"
+          >
+            <template #groupheader="slotProps">
+              <div class="flex items-center gap-2">
+                <p class="font-bold">
+                  Category
+                  <span class="italic underline text-primary">"{{ slotProps.data.category }}"</span>
+                </p>
+              </div>
+            </template>
+            <Column field="product.description" header="Description">
+              <template #body="{ data }">
+                {{ data.product.description + ' ' + (data.product.annotations ?? '') }}
+              </template>
+              <template #editor="{ data }">
+                <div class="flex flex-col gap-2">
+                  <label>
+                    Product Description:
+                    <InputText v-model="data.product.description" />
+                  </label>
+                  <label>
+                    Product detail Annotations:
+                    <InputText
+                      v-model="data.product.annotations"
+                      aria-placeholder="Extra annotations"
+                    />
+                  </label>
+                </div>
+              </template>
+            </Column>
+            <Column field="quantity" header="Quantity">
+              <template #editor="{ data, field }">
+                <InputNumber v-model="data[field]" />
+              </template>
+            </Column>
+            <Column field="price" header="Unit Price">
+              <template #body="slotProps">
+                {{ formatCurrency(slotProps.data.price) }}
+              </template>
+              <template #editor="{ data }">
+                <InputText v-model.number="data.price" fluid />
+              </template>
+            </Column>
           </DataTable>
         </div>
       </template>
