@@ -17,6 +17,9 @@ importers:
       axios:
         specifier: ^1.8.4
         version: 1.8.4
+      bignumber.js:
+        specifier: ^9.2.1
+        version: 9.2.1
       chart.js:
         specifier: ^4.4.7
         version: 4.4.8
@@ -966,6 +969,9 @@ packages:
 
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
+
+  bignumber.js@9.2.1:
+    resolution: {integrity: sha512-+NzaKgOUvInq9TIUZ1+DRspzf/HApkCwD4btfuasFTdrfnOxqx853TgDpMolp+uv4RpRp7bPcEU2zKr9+fRmyw==}
 
   binary-extensions@2.3.0:
     resolution: {integrity: sha512-Ceh+7ox5qe7LJuLHoY0feh3pHuUDHAcRUeyL2VYghZwfpkNIy/+8Ocg0a3UuSoYzavmylwuLWQOf3hl0jjMMIw==}
@@ -2926,6 +2932,8 @@ snapshots:
       - debug
 
   balanced-match@1.0.2: {}
+
+  bignumber.js@9.2.1: {}
 
   binary-extensions@2.3.0: {}
 

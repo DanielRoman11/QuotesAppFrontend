@@ -1,15 +1,33 @@
 <script setup lang="ts">
 import useQuotes from '@/composables/useQuotes'
 import { formatCurrency, formatDate } from '@/utils/common'
-import { Column, DataTable, InputNumber, InputText, Tag } from 'primevue'
+import { Column, DataTable, Dialog, InputNumber, InputText, Tag } from 'primevue'
 import { Currency, ApprovedBy, QuoteStatus } from '@/utils/interfaces'
 
-const { quotes, search, editingRows, expandedRows, updateQuote, getSeverity } = useQuotes()
+const {
+  quotes,
+  search,
+  editingRows,
+  expandedRows,
+  updateQuote,
+  getSeverity,
+  openItemsDialog,
+  onCellEditComplete,
+  dialogVisible,
+  selectedQuote,
+	getAuthorImage,
+	getTotalByAuthor,
+	getSuccessByAuthor,
+	getQuotesByAuthor,
+} = useQuotes()
 </script>
 <template>
   <div class="card">
     <DataTable
-      v-model:expanded-rows="expandedRows"
+      v-model:expandedRowGroups="expandedRows"
+      :expandableRowGroups="true"
+      rowGroupMode="subheader"
+      groupRowsBy="author"
       v-model:editingRows="editingRows"
       :value="quotes"
       editMode="row"
@@ -17,9 +35,8 @@ const { quotes, search, editingRows, expandedRows, updateQuote, getSeverity } = 
       @row-edit-save="updateQuote"
       tableStyle="min-width: 220rem"
       scrollable
-      scrollHeight="400px"
-      rowGroupMode="subheader"
-      groupRowsBy="author"
+      scrollHeight="800px"
+      sort-mode="single"
       sort-field="author"
       :sort-order="1"
       :pt="{
@@ -31,16 +48,17 @@ const { quotes, search, editingRows, expandedRows, updateQuote, getSeverity } = 
       }"
     >
       <template #groupheader="slotProps">
-        <div class="flex items-center gap-2 !z-50">
-          <img
-            :alt="`Imagen de ${slotProps.data.author}`"
-            src="https://hidroconsulting.com.co/svg/HidroLogoNoTxt.svg"
-            width="32"
-          />
-          <p class="capitalize font-semibold">
-            {{ slotProps.data.author }}
-          </p>
-        </div>
+        <img
+          :alt="`Imagen de ${slotProps.data.author}`"
+          :src="getAuthorImage(slotProps.data.author)"
+          width="32"
+          style="vertical-align: middle; display: inline-block"
+          class="ml-2 rounded-full"
+        />
+        <span class="align-middle ml-2 font-bold leading-normal">{{ slotProps.data.author }}</span>
+        <span class="ml-2 text-sm text-primary">
+          ({{ getQuotesByAuthor(slotProps.data.author) }} cotizaciones)
+        </span>
       </template>
       <template #header>
         <IconField>
@@ -51,7 +69,6 @@ const { quotes, search, editingRows, expandedRows, updateQuote, getSeverity } = 
         </IconField>
       </template>
       <Column rowEditor style="width: 5rem" bodyStyle="text-align:center" :frozen="true" />
-      <Column expander style="width: 5rem" header="Items" />
 
       <Column field="priority" header="Priority">
         <template #body="slotProps">
@@ -59,7 +76,19 @@ const { quotes, search, editingRows, expandedRows, updateQuote, getSeverity } = 
         </template>
       </Column>
 
-      <Column field="id" header="Consecutive" class="font-bold" :frozen="true" />
+      <Column field="id" header="Consecutive" :frozen="true" />
+
+      <Column header="Items">
+        <template #body="slotProps">
+          <Button
+            icon="pi pi-external-link"
+            label="Items"
+            text
+            @click="openItemsDialog(slotProps.data)"
+          />
+        </template>
+      </Column>
+
       <Column field="currency" header="Currency">
         <template #editor="{ data, field }">
           <Dropdown v-model="data[field]" :options="Object.values(Currency)" />
@@ -137,64 +166,92 @@ const { quotes, search, editingRows, expandedRows, updateQuote, getSeverity } = 
         </template>
       </Column>
 
-      <template #expansion="slotProps">
-        <div class="p-3">
-          <h5 class="text-balance">
-            All Items from
-            <span class="font-bold underline text-primary">{{ slotProps.data.id }}</span>
-          </h5>
+      <Dialog
+        v-model:visible="dialogVisible"
+        modal
+        :draggable="false"
+        :header="'Items de Cotización ' + selectedQuote?.id"
+        :style="{ width: '80vw' }"
+      >
+        <div v-if="selectedQuote">
           <DataTable
-            :value="slotProps.data.items"
+            :value="selectedQuote.items"
+            scrollable
+            scroll-height="300px"
             rowGroupMode="subheader"
             groupRowsBy="category"
             editMode="cell"
             dataKey="id"
-            tableStyle="width: 70rem"
+            tableStyle="width: 100%"
             :sortField="'category'"
             :sortOrder="1"
+            @cell-edit-complete="onCellEditComplete"
           >
             <template #groupheader="slotProps">
-              <div class="flex items-center gap-2">
-                <p class="font-bold">
-                  Category
-                  <span class="italic underline text-primary">"{{ slotProps.data.category }}"</span>
-                </p>
-              </div>
+              <p class="font-bold">
+                Category
+                <span class="italic text-primary">"{{ slotProps.data.category }}"</span>
+              </p>
             </template>
+
             <Column field="product.description" header="Description">
               <template #body="{ data }">
-                {{ data.product.description + ' ' + (data.product.annotations ?? '') }}
+                {{ data.product.description }}
               </template>
               <template #editor="{ data }">
-                <div class="flex flex-col gap-2">
-                  <label>
-                    Product Description:
-                    <InputText v-model="data.product.description" />
-                  </label>
-                  <label>
-                    Product detail Annotations:
-                    <InputText
-                      v-model="data.product.annotations"
-                      aria-placeholder="Extra annotations"
-                    />
-                  </label>
-                </div>
+                <label>
+                  Product Description:
+                  <InputText v-model="data.product.description" />
+                </label>
               </template>
             </Column>
+            <Column field="annotations" header="Annotations">
+              <template #editor="{ data }">
+                <label>
+                  Annotations:
+                  <InputText v-model="data.annotations" />
+                </label>
+              </template>
+            </Column>
+
             <Column field="quantity" header="Quantity">
-              <template #editor="{ data, field }">
-                <InputNumber v-model="data[field]" />
+              <template #editor="{ data }">
+                <InputNumber v-model="data.quantity" :min="0" fluid />
               </template>
             </Column>
+
             <Column field="price" header="Unit Price">
               <template #body="slotProps">
                 {{ formatCurrency(slotProps.data.price) }}
               </template>
               <template #editor="{ data }">
-                <InputText v-model.number="data.price" fluid />
+                <InputNumber
+                  v-model.number="data.price"
+                  mode="currency"
+                  :currency="selectedQuote.currency"
+                  :locale="selectedQuote.currency === 'COP' ? 'es-CO' : 'en-US'"
+                  :min="0"
+                  fluid
+                />
               </template>
             </Column>
           </DataTable>
+        </div>
+      </Dialog>
+      <template #groupfooter="slotProps">
+        <div class="flex items-center justify-start gap-5 text-sm text-muted-color-emphasis">
+          <p>
+            Total Quoted
+            <span class="ml-1 font-semibold">
+              {{ formatCurrency(getTotalByAuthor(slotProps.data.author)) }}
+            </span>
+          </p>
+          <p>
+            Success Rate
+            <span class="ml-1 font-semibold">
+              {{ getSuccessByAuthor(slotProps.data.author) }} %
+            </span>
+          </p>
         </div>
       </template>
     </DataTable>

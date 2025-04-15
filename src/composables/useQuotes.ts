@@ -1,4 +1,5 @@
 import axios from 'axios'
+import BigNumber from 'bignumber.js'
 import { useToast } from 'primevue'
 import { onMounted, ref, watch } from 'vue'
 
@@ -7,13 +8,9 @@ export default function useProduct() {
   const search = ref<string>('')
   const quotes = ref<any[]>([])
   const editingRows = ref([])
-  const expandedRows = ref({})
-  const itemsColumns = [
-    { field: 'id', header: 'ID', editable: false },
-    { field: 'description', header: 'Description', editable: false },
-    { field: 'quantity', header: 'Quantity', editable: true },
-    { field: 'price', header: 'Price', editable: true },
-  ]
+  const expandedRows = ref([])
+  const dialogVisible = ref(false)
+  const selectedQuote = ref<any>(null)
 
   async function getQuotes(search: string) {
     try {
@@ -30,14 +27,11 @@ export default function useProduct() {
 
   const updateQuote = async (event: any) => {
     const { newData } = event
-    console.log('Datos nuevos:', newData)
 
     const index = quotes.value.findIndex((q: any) => q.id === newData.id)
     if (index !== -1) {
-      //? Copia profunda de los datos
-      const prevData = JSON.parse(JSON.stringify(quotes.value[index]))
-      //? Actualización optimista
-      quotes.value.splice(index, 1, newData)
+      const prevData = JSON.parse(JSON.stringify(quotes.value[index])) //? Copia profunda de los datos
+      quotes.value.splice(index, 1, newData) //? Actualización optimista
 
       try {
         await axios.patch(`http://localhost:3000/quote/${newData.id}`, newData)
@@ -56,8 +50,27 @@ export default function useProduct() {
           life: 3000,
         })
 
-        //? Revertir la actualización optimista usando el estado anterior
-        quotes.value.splice(index, 1, prevData)
+        quotes.value.splice(index, 1, prevData) //? Revertir la actualización optimista usando el estado anterior
+      }
+    }
+  }
+
+  const openItemsDialog = (quote: null) => {
+    selectedQuote.value = quote
+    dialogVisible.value = true
+  }
+
+  const onCellEditComplete = (event: { newValue: any; field: any; data: any }) => {
+    const { newValue, field, data: item } = event
+    if (newValue !== undefined) {
+      item[field] = newValue
+
+      const quote = quotes.value.find((q) => q.items.includes(item))
+      if (quote) {
+        quote.totalPrice = quote.items.reduce(
+          (acc: number, i: { quantity: number; price: number }) => acc + i.quantity * i.price,
+          0,
+        )
       }
     }
   }
@@ -86,6 +99,56 @@ export default function useProduct() {
     }
   }
 
+  const getAuthorImage = (author: string) => {
+    switch (author) {
+      case 'DANIEL MORA ROMÁN':
+        return 'https://avatars.githubusercontent.com/u/88067941?v=4'
+      case 'DUVAN MORA ROMÁN':
+        return 'https://res.cloudinary.com/dakerpersonalspace/image/upload/f_auto,q_auto/v1/Hidro/n2jjdllyzsdvhp5shpff'
+      default:
+        return 'https://primefaces.org/cdn/primevue/images/avatar/ionibowcher.png'
+    }
+  }
+
+  const getTotalByAuthor = (author: string) => {
+    return quotes.value
+      .filter((q) => q.author === author)
+      .reduce((sum, q) => {
+        const price = new BigNumber(q.totalPrice || 0)
+        let multiplier = new BigNumber(1)
+
+        switch (q.currency) {
+          case 'USD':
+            multiplier = new BigNumber(4000)
+            break
+          case 'EUR':
+            multiplier = new BigNumber(4500)
+            break
+          case 'COP':
+          default:
+            multiplier = new BigNumber(1)
+            break
+        }
+
+        return sum.plus(price.multipliedBy(multiplier))
+      }, new BigNumber(0))
+      .toFixed(2)
+  }
+
+  const getSuccessByAuthor = (author: string) => {
+    const authorQuotes = quotes.value.filter((q) => q.author === author)
+    const authorTotalQuotes = new BigNumber(authorQuotes.length)
+    const authorTotalOrders = new BigNumber(
+      JSON.parse(JSON.stringify(authorQuotes)).filter((q: any) => q.order).length,
+    )
+
+    return authorTotalOrders.dividedBy(authorTotalQuotes).times(100).toFixed(2)
+  }
+
+  const getQuotesByAuthor = (author: string) => {
+    return quotes.value.filter((q) => q.author === author).length
+  }
+
   onMounted(getQuotes)
 
   let debounceTimeout: ReturnType<typeof setTimeout>
@@ -100,9 +163,16 @@ export default function useProduct() {
     quotes,
     search,
     editingRows,
-    itemsColumns,
     expandedRows,
     updateQuote,
     getSeverity,
+    openItemsDialog,
+    onCellEditComplete,
+    dialogVisible,
+    selectedQuote,
+    getAuthorImage,
+    getQuotesByAuthor,
+    getSuccessByAuthor,
+    getTotalByAuthor,
   }
 }
