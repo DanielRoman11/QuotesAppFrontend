@@ -2,20 +2,16 @@ import axios from 'axios'
 import { computed, onMounted, ref } from 'vue'
 
 export default function useStats() {
-  const totalquotes = ref(0)
-  const totalclients = ref(0)
-  const revenue = ref(0)
-  const success = ref(0)
+  const currentStats = ref<any>({})
+  const lastMonthStats = ref<any>({})
 
   async function fetchStats() {
     try {
       const result = await axios.get('http://localhost:3000')
       const data = result.data
 
-      totalquotes.value = Number(data.totalquotes)
-      totalclients.value = Number(data.totalclients)
-      revenue.value = Number(Number(data.revenue).toFixed(2))
-      success.value = Number(data.success)
+      currentStats.value = data.find((item: any) => item.datequery === 'Current Month') || {}
+      lastMonthStats.value = data.find((item: any) => item.datequery === 'Last Month') || {}
     } catch (err) {
       console.error(err)
     }
@@ -27,26 +23,38 @@ export default function useStats() {
     {
       title: 'Total Quotes',
       icon: 'pi-shopping-cart',
-      value: totalquotes.value,
-      subtitle: 'Last Month',
+      value: {
+        current: currentStats.value.totalquotes ? Number(currentStats.value.totalquotes) : 0,
+        last: lastMonthStats.value.totalquotes ? Number(lastMonthStats.value.totalquotes) : 0,
+      },
+      subtitle: 'Quotes',
     },
     {
-      title: 'Total Clients',
-      icon: 'pi-users',
-      value: totalclients.value,
-      subtitle: 'Last Month',
+      title: 'Total Orders',
+      icon: 'pi-list',
+      value: {
+        current: currentStats.value.totalorders ? Number(currentStats.value.totalorders) : 0,
+        last: lastMonthStats.value.totalorders ? Number(lastMonthStats.value.totalorders) : 0,
+      },
+      subtitle: 'Orders',
     },
     {
       title: 'Revenue',
       icon: 'pi-dollar',
-      value: `${revenue.value}`,
-      subtitle: 'Last Month',
+      value: {
+        current: currentStats.value.revenue ? Number(Number(currentStats.value.revenue).toFixed(2)) : 0,
+        last: lastMonthStats.value.revenue ? Number(Number(lastMonthStats.value.revenue).toFixed(2)) : 0,
+      },
+      subtitle: 'Revenue',
     },
     {
       title: 'Success Rate',
       icon: 'pi-chart-line',
-      value: `${success.value}%`,
-      subtitle: 'Last Month',
+      value: {
+        current: currentStats.value.success ? `${currentStats.value.success}%` : '0%',
+        last: lastMonthStats.value.success ? `${lastMonthStats.value.success}%` : '0%',
+      },
+      subtitle: 'Success',
     },
   ])
 
