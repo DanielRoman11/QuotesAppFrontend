@@ -4,7 +4,7 @@
   >
     <div class="flex justify-between items-center sm:flex-row flex-col gap-2">
       <div class="text-sm text-surface-600 dark:text-surface-400">
-        Built with PrimeVue. By
+        Built with by
         <span class="font-bold"> Daniel Román </span>
       </div>
       <div class="flex gap-4">

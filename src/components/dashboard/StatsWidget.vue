@@ -1,31 +1,8 @@
 <script setup lang="ts">
 import useStats from '@/composables/useStats'
 import { formatCurrency } from '@/utils/common'
-import { ref } from 'vue'
 
-const { stats } = useStats()
-
-const quotesData = ref({
-  labels: ['Current Month', 'Last Month'],
-  datasets: [
-    {
-      label: 'Total Quotes',
-      backgroundColor: '#42A5F5',
-      data: [stats.value[3].value.current, stats.value[1].value.last],
-    },
-  ],
-})
-
-const revenueData = ref({
-  labels: ['Current Month', 'Last Month'],
-  datasets: [
-    {
-      label: 'Revenue',
-      backgroundColor: '#66BB6A',
-      data: [stats.value[0].value.current, stats.value[1].value.last],
-    },
-  ],
-})
+const { stats, currencyData, quotesData } = useStats()
 </script>
 
 <template>
@@ -50,14 +27,24 @@ const revenueData = ref({
         <div
           class="text-2xl text-center text-primary overflow-hidden line-clamp-1 whitespace-pre font-medium leading-tight"
         >
-          {{ stat.title !== 'Revenue' ? stat.value.current : formatCurrency(stat.value.current) }}
+          {{
+            ['Revenue', 'Currency Trend'].includes(stat.title) &&
+            typeof stat.value.current === 'number'
+              ? formatCurrency(stat.value.current)
+              : stat.value.current
+          }}
         </div>
         <div class="text-surface-600 dark:text-surface-400 text-sm leading-tight"></div>
 
         <!-- Mostrar datos del mes anterior -->
         <div class="text-sm font-medium leading-tight text-muted-color mt-2">
-          {{ stat.title !== 'Revenue' ? stat.value.last : formatCurrency(stat.value.last) }} Last
-          Month
+          {{
+            ['Revenue', 'Currency Trend'].includes(stat.title) &&
+            typeof stat.value.current === 'number'
+              ? formatCurrency(stat.value.current)
+              : stat.value.current
+          }}
+          Last Month
         </div>
         <div class="text-surface-600 dark:text-surface-400 text-sm leading-tight"></div>
       </div>
@@ -66,12 +53,12 @@ const revenueData = ref({
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
     <div class="col-span-1">
       <p-card title="Total Quotes" class="shadow-2xl">
-        <Chart :type="'bar'" :data="quotesData" />
+        <Chart type="bar" :data="quotesData" class="h-64" />
       </p-card>
     </div>
     <div class="col-span-1">
       <p-card title="Revenue" class="shadow-2xl">
-        <Chart :type="'bar'" :data="revenueData" />
+        <Chart :type="'bar'" :data="currencyData" class="h-64" />
       </p-card>
     </div>
   </div>
