@@ -40,9 +40,9 @@ const { stats, currencyData, quotesData } = useStats()
         <div class="text-sm font-medium leading-tight text-muted-color mt-2">
           {{
             ['Revenue', 'Currency Trend'].includes(stat.title) &&
-            typeof stat.value.current === 'number'
-              ? formatCurrency(stat.value.current)
-              : stat.value.current
+            typeof stat.value.last === 'number'
+              ? formatCurrency(stat.value.last)
+              : stat.value.last
           }}
           Last Month
         </div>
