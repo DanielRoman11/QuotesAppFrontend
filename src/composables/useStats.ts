@@ -1,5 +1,7 @@
 import axios from 'axios'
 import { computed, onMounted, ref, watch } from 'vue'
+import BigNumber from 'bignumber.js'
+import * as Chartjs from 'chart.js'
 
 export default function useStats() {
   const currentStats = ref<any>({})
@@ -7,79 +9,10 @@ export default function useStats() {
   const quotesData = ref({})
   const currencyData = ref({})
 
-  function setQuotesData() {
-    return {
-      labels: ['Last Month', 'Current Month'],
-      datasets: [
-        {
-          label: 'Total Quotes',
-          data: [stats.value[0].value.last, stats.value[0].value.current],
-          backgroundColor: ['#42A5F5', '#12B886'],
-        },
-        {
-          label: 'Total Orders',
-          data: [stats.value[1].value.last, stats.value[1].value.current],
-          backgroundColor: ['#66BB6A', '#42A5F5'],
-        },
-      ],
-    }
-  }
-
-  function setCurrencyData() {
-    return {
-      labels: ['Last Month', 'Current Month'],
-      datasets: [
-        {
-          label: 'USD',
-          data: [
-            currencyTrend.value.data.dolarLast ? Number(currencyTrend.value.data.dolarLast) : 0,
-            currencyTrend.value.data.dolarCurrent
-              ? Number(currencyTrend.value.data.dolarCurrent)
-              : 0,
-          ],
-          backgroundColor: '#36A2EB',
-          borderColor: '#36A2EB',
-          fill: false,
-        },
-        {
-          label: 'EUR',
-          data: [
-            currencyTrend.value.data.euroLast ? Number(currencyTrend.value.data.euroLast) : 0,
-            currencyTrend.value.data.euroCurrent ? Number(currencyTrend.value.data.euroCurrent) : 0,
-          ],
-          backgroundColor: '#FFCE56',
-          borderColor: '#FFCE56',
-          fill: false,
-        },
-        {
-          label: 'COP',
-          data: [
-            currencyTrend.value.data.copLast ? Number(currencyTrend.value.data.copLast) : 0,
-            currencyTrend.value.data.copCurrent ? Number(currencyTrend.value.data.dolarCurrent) : 0,
-          ],
-          backgroundColor: '#4BC0C0',
-          borderColor: '#4BC0C0',
-          fill: false,
-        },
-      ],
-      options: {
-        plugins: {
-          legend: {
-            title: {
-              display: true,
-              text: 'Currency Trend',
-            },
-          },
-        },
-      },
-    }
-  }
-
   async function fetchStats() {
     try {
       const result = await axios.get('http://localhost:3000/stats')
       const data = result.data
-      console.log(data)
 
       currentStats.value = data.find((item: any) => item.datequery === 'Current Month') || {}
       lastMonthStats.value = data.find((item: any) => item.datequery === 'Last Month') || {}
@@ -87,8 +20,6 @@ export default function useStats() {
       console.error(err)
     }
   }
-
-  onMounted(fetchStats)
 
   const stats = computed(() => [
     {
@@ -137,18 +68,120 @@ export default function useStats() {
     title: 'Currency Trend',
     icon: 'pi-chart-line',
     data: {
-      dolarCurrent: currentStats.value.quotedusd ? Number(currentStats.value.quotedusd) : 0,
-      dolarLast: lastMonthStats.value.quotedusd ? Number(lastMonthStats.value.quotedusd) : 0,
-      euroCurrent: currentStats.value.quotedeur ? Number(currentStats.value.quotedeur) : 0,
-      euroLast: lastMonthStats.value.quotedeur ? Number(lastMonthStats.value.quotedeur) : 0,
-      copCurrent: currentStats.value.quotedcop ? Number(currentStats.value.quotedcop) : 0,
-      copLast: lastMonthStats.value.quotedcop ? Number(lastMonthStats.value.quotedcop) : 0,
+      dolarCurrent: currentStats.value.quotedusd
+        ? Number(BigNumber(currentStats.value.quotedusd).times(4400).toFixed(2))
+        : 0,
+      dolarLast: lastMonthStats.value.quotedusd
+        ? Number(BigNumber(lastMonthStats.value.quotedusd).times(4400).toFixed(2))
+        : 0,
+      euroCurrent: currentStats.value.quotedeur
+        ? Number(BigNumber(currentStats.value.quotedeur).times(4500).toFixed(2))
+        : 0,
+      euroLast: lastMonthStats.value.quotedeur
+        ? Number(BigNumber(lastMonthStats.value.quotedeur).times(4500).toFixed(2))
+        : 0,
+      copCurrent: currentStats.value.quotedcop
+        ? Number(BigNumber(currentStats.value.quotedcop).toFixed(2))
+        : 0,
+      copLast: lastMonthStats.value.quotedcop
+        ? Number(BigNumber(lastMonthStats.value.quotedcop).toFixed(2))
+        : 0,
     },
     subtitle: 'Quoted By Currency',
   }))
 
-	watch(
-    () => stats.value,
+  Chartjs.Chart.register(Chartjs.Title, Chartjs.Legend, Chartjs.Tooltip)
+
+  function setQuotesData() {
+    return {
+      data: {
+        labels: ['Total Orders', 'Total Quotes'],
+        datasets: [
+          {
+            label: 'Current Month',
+            data: [stats.value[1].value.current, stats.value[0].value.current],
+            backgroundColor: ['hsl(210, 100%, 40%)', 'hsl(100, 90%, 40%)'],
+          },
+          {
+            label: 'Last Month',
+            data: [stats.value[1].value.last, stats.value[0].value.last],
+            backgroundColor: ['hsl(160, 100%, 40%)', 'hsl(60, 90%, 40%)'],
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Quotes with Orders',
+          },
+          legend: {
+            display: true,
+            position: 'top',
+          },
+        },
+      },
+    }
+  }
+
+  function setCurrencyData() {
+    return {
+      data: {
+        labels: ['Last Month', 'Current Month'],
+        datasets: [
+          {
+            label: 'USD',
+            data: [
+              currencyTrend.value.data.dolarLast ? currencyTrend.value.data.dolarLast : 0,
+              currencyTrend.value.data.dolarCurrent ? currencyTrend.value.data.dolarCurrent : 0,
+            ],
+            backgroundColor: '#36A2EB',
+            borderColor: '#36A2EB',
+            fill: false,
+          },
+          {
+            label: 'EUR',
+            data: [
+              currencyTrend.value.data.euroLast ? currencyTrend.value.data.euroLast : 0,
+              currencyTrend.value.data.euroCurrent ? currencyTrend.value.data.euroCurrent : 0,
+            ],
+            backgroundColor: '#FFCE56',
+            borderColor: '#FFCE56',
+            fill: false,
+          },
+          {
+            label: 'COP',
+            data: [
+              currencyTrend.value.data.copLast ? currencyTrend.value.data.copLast : 0,
+              currencyTrend.value.data.copCurrent ? currencyTrend.value.data.copCurrent : 0,
+            ],
+            backgroundColor: '#4BC0C0',
+            borderColor: '#4BC0C0',
+            fill: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Currency Trend in COP',
+          },
+          legend: {
+            display: true,
+            position: 'top',
+          },
+        },
+      },
+    }
+  }
+
+  onMounted(fetchStats)
+
+  watch(
+    () => [stats.value, currentStats.value, lastMonthStats.value],
     (newStats) => {
       if (newStats.length) {
         quotesData.value = setQuotesData()
@@ -161,7 +194,7 @@ export default function useStats() {
   return {
     stats,
     currencyTrend,
-		quotesData,
-		currencyData,
+    quotesData,
+    currencyData,
   }
 }
