@@ -94,18 +94,25 @@ export default function useStats() {
 
   function setQuotesData() {
     return {
+      type: 'line',
       data: {
-        labels: ['Total Orders', 'Total Quotes'],
+        labels: ['Last Month', 'Current Month'], // Eje X: el tiempo
         datasets: [
           {
-            label: 'Current Month',
-            data: [stats.value[1].value.current, stats.value[0].value.current],
-            backgroundColor: ['hsl(210, 100%, 40%)', 'hsl(100, 90%, 40%)'],
+            label: 'Total Quotes',
+            data: [stats.value[0].value.last, stats.value[0].value.current], // valores en el tiempo
+            backgroundColor: 'rgba(255, 206, 86, 0.4)',
+            borderColor: '#FFCE56',
+            fill: true,
+            tension: 0.4,
           },
           {
-            label: 'Last Month',
-            data: [stats.value[1].value.last, stats.value[0].value.last],
-            backgroundColor: ['hsl(160, 100%, 40%)', 'hsl(60, 90%, 40%)'],
+            label: 'Total Orders',
+            data: [stats.value[1].value.last, stats.value[1].value.current],
+            backgroundColor: 'rgba(54, 162, 235, 0.4)',
+            borderColor: '#36A2EB',
+            fill: true,
+            tension: 0.4,
           },
         ],
       },
@@ -127,6 +134,7 @@ export default function useStats() {
 
   function setCurrencyData() {
     return {
+      type: 'bar',
       data: {
         labels: ['Last Month', 'Current Month'],
         datasets: [
@@ -137,7 +145,6 @@ export default function useStats() {
               currencyTrend.value.data.dolarCurrent ? currencyTrend.value.data.dolarCurrent : 0,
             ],
             backgroundColor: '#36A2EB',
-            borderColor: '#36A2EB',
             fill: false,
           },
           {
@@ -147,7 +154,6 @@ export default function useStats() {
               currencyTrend.value.data.euroCurrent ? currencyTrend.value.data.euroCurrent : 0,
             ],
             backgroundColor: '#FFCE56',
-            borderColor: '#FFCE56',
             fill: false,
           },
           {

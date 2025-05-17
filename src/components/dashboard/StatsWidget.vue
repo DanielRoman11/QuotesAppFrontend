@@ -52,14 +52,19 @@ const { stats, currencyData, quotesData } = useStats()
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
     <div class="col-span-1">
-      <p-card title="Total Quotes" class="shadow-2xl flex items-center justify-center w-full">
-        <Chart type="doughnut" :data="quotesData.data" :options="quotesData.options" class="h-64" />
+      <p-card title="Total Quotes" class="shadow-2xl flex items-center justify-center *:flex-1">
+        <Chart
+          :type="quotesData.type"
+          :data="quotesData.data"
+          :options="quotesData.options"
+          class="h-64"
+        />
       </p-card>
     </div>
     <div class="col-span-1">
       <p-card title="Currency" class="shadow-2xl">
         <Chart
-          :type="'bar'"
+          :type="currencyData.type"
           :data="currencyData.data"
           :options="currencyData.options"
           class="h-64"
