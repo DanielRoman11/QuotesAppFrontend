@@ -2,6 +2,7 @@ import axios from 'axios'
 import { computed, onMounted, ref, watch } from 'vue'
 import BigNumber from 'bignumber.js'
 import * as Chartjs from 'chart.js'
+import config from '@/config'
 
 export default function useStats() {
   const currentStats = ref<any>({})
@@ -11,7 +12,7 @@ export default function useStats() {
 
   async function fetchStats() {
     try {
-      const result = await axios.get('http://localhost:3000/stats')
+      const result = await axios.get(`${config.API_URL}/stats`)
       const data = result.data
 
       currentStats.value = data.find((item: any) => item.datequery === 'Current Month') || {}

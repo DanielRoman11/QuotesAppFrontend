@@ -1,3 +1,4 @@
+import config from '@/config'
 import axios from 'axios'
 import BigNumber from 'bignumber.js'
 import { useToast } from 'primevue'
@@ -11,10 +12,11 @@ export default function useProduct() {
   const expandedRows = ref([])
   const dialogVisible = ref(false)
   const selectedQuote = ref<any>(null)
+  const errors = ref<any>([])
 
   async function getQuotes(search: string) {
     try {
-      const response = await axios.get('http://localhost:3000/quote', {
+      const response = await axios.get(`${config.API_URL}/quote`, {
         params: {
           search,
         },
@@ -34,7 +36,7 @@ export default function useProduct() {
       quotes.value.splice(index, 1, newData) //? Actualización optimista
 
       try {
-        await axios.patch(`http://localhost:3000/quote/${newData.id}`, newData)
+        await axios.patch(`${config.API_URL}/quote/${newData.id}`, newData)
         toast.add({
           severity: 'success',
           summary: 'Actualizado',
@@ -43,6 +45,7 @@ export default function useProduct() {
         })
       } catch (error) {
         console.error('Error al actualizar:', error)
+        errors.value.push(error)
         toast.add({
           severity: 'error',
           summary: 'Error',
@@ -162,6 +165,7 @@ export default function useProduct() {
   return {
     quotes,
     search,
+    errors,
     editingRows,
     expandedRows,
     updateQuote,
