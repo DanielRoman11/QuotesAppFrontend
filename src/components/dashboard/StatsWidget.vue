@@ -46,13 +46,12 @@ const { stats, currencyData, quotesData } = useStats()
           }}
           Last Month
         </div>
-        <div class="text-surface-600 dark:text-surface-400 text-sm leading-tight"></div>
       </div>
     </div>
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
     <div class="col-span-1">
-      <p-card title="Total Quotes" class="shadow-2xl flex items-center justify-center *:flex-1">
+      <p-card title="Total Quotes" class="flex items-center justify-center *:flex-1 border border-slate-200 dark:border-neutral-500 rounded-2xl px-4 py-2">
         <Chart
           :type="quotesData.type"
           :data="quotesData.data"
@@ -62,7 +61,7 @@ const { stats, currencyData, quotesData } = useStats()
       </p-card>
     </div>
     <div class="col-span-1">
-      <p-card title="Currency" class="shadow-2xl">
+      <p-card title="Total Quotes" class="flex items-center justify-center *:flex-1 border border-slate-200 dark:border-neutral-500 rounded-2xl px-4 py-2">
         <Chart
           :type="currencyData.type"
           :data="currencyData.data"
