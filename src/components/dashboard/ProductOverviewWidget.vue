@@ -5,6 +5,7 @@ import { Column, DataTable, Dialog, InputNumber, InputText, Tag } from 'primevue
 import { Currency, ApprovedBy, QuoteStatus } from '@/utils/interfaces'
 
 const {
+  errors,
   quotes,
   search,
   editingRows,
@@ -15,10 +16,10 @@ const {
   onCellEditComplete,
   dialogVisible,
   selectedQuote,
-	getAuthorImage,
-	getTotalByAuthor,
-	getSuccessByAuthor,
-	getQuotesByAuthor,
+  getAuthorImage,
+  getTotalByAuthor,
+  getSuccessByAuthor,
+  getQuotesByAuthor,
 } = useQuotes()
 </script>
 <template>
@@ -255,5 +256,25 @@ const {
         </div>
       </template>
     </DataTable>
+    <div v-if="errors.length > 0" class="mt-4 space-y-4">
+      <div
+        v-for="(error, index) in errors"
+        :key="index"
+        role="alert"
+        class="bg-red-100 dark:bg-red-900 p-6 rounded-xl border border-red-200 dark:border-red-700"
+      >
+        <div class="flex items-start justify-between gap-4">
+          <h3 class="text-lg font-semibold text-red-700 dark:text-red-300">
+            There was an error while updating the quote, details are below:
+          </h3>
+        </div>
+
+        <ul class="mt-4 list-disc list-inside text-sm text-red-800 dark:text-red-200 space-y-1">
+          <li v-for="(message, msgIndex) in error.response?.data?.message || []" :key="msgIndex">
+            {{ message }}
+          </li>
+        </ul>
+      </div>
+    </div>
   </div>
 </template>
