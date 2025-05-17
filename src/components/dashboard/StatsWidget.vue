@@ -40,9 +40,9 @@ const { stats, currencyData, quotesData } = useStats()
         <div class="text-sm font-medium leading-tight text-muted-color mt-2">
           {{
             ['Revenue', 'Currency Trend'].includes(stat.title) &&
-            typeof stat.value.current === 'number'
-              ? formatCurrency(stat.value.current)
-              : stat.value.current
+            typeof stat.value.last === 'number'
+              ? formatCurrency(stat.value.last)
+              : stat.value.last
           }}
           Last Month
         </div>
@@ -52,13 +52,18 @@ const { stats, currencyData, quotesData } = useStats()
   </div>
   <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
     <div class="col-span-1">
-      <p-card title="Total Quotes" class="shadow-2xl">
-        <Chart type="bar" :data="quotesData" class="h-64" />
+      <p-card title="Total Quotes" class="shadow-2xl flex items-center justify-center w-full">
+        <Chart type="doughnut" :data="quotesData.data" :options="quotesData.options" class="h-64" />
       </p-card>
     </div>
     <div class="col-span-1">
-      <p-card title="Revenue" class="shadow-2xl">
-        <Chart :type="'bar'" :data="currencyData" class="h-64" />
+      <p-card title="Currency" class="shadow-2xl">
+        <Chart
+          :type="'bar'"
+          :data="currencyData.data"
+          :options="currencyData.options"
+          class="h-64"
+        />
       </p-card>
     </div>
   </div>
