@@ -1,5 +1,5 @@
 import { updatePrimaryPalette, updateSurfacePalette } from '@primeuix/themes'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { primaryColors, surfaces } from './theme'
 
 const STORAGE_KEY = 'themeSettings'
@@ -51,6 +51,14 @@ export function useLayout() {
   const isDarkMode = computed(() => appState.value.darkMode)
   const primary = computed(() => appState.value.primary)
   const surface = computed(() => appState.value.surface)
+
+  onMounted(() => {
+    const primaryColor = primaryColors.value.find((c) => c.name === primary.value)
+    if (primaryColor) updatePrimaryPalette(primaryColor.palette)
+
+    const surfaceColor = surfaces.value.find((s) => s.name === surface.value)
+    if (surfaceColor) updateSurfacePalette(surfaceColor.palette)
+  })
 
   return {
     primaryColors,

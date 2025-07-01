@@ -12,6 +12,7 @@ export default function useStats() {
 
   async function fetchStats() {
     try {
+			console.log("URL BACKEND", config.API_URL)
       const result = await axios.get(`${config.API_URL}/stats`)
       const data = result.data
 

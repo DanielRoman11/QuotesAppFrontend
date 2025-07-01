@@ -1,14 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import Button from 'primevue/button'
 
-const menuItems = ref([
-  { icon: 'pi pi-home', title: 'Inicio' },
-  { icon: 'pi pi-user', title: 'Perfil' },
-  { icon: 'pi pi-cog', title: 'Configuración' },
-])
+const menuItems = [
+  { icon: 'pi pi-home', title: 'Home', path: '/' },
+  { icon: 'pi pi-chart-bar', title: 'Dashboard', path: '/dashboard' },
+  { icon: 'pi pi-book', title: 'Quotes', path: '/quotes' },
+]
 
-const logoutItem = { icon: 'pi pi-sign-out', title: 'Salir' }
+const logoutItem = { icon: 'pi pi-sign-out', title: 'Logout' }
 </script>
 
 <template>
@@ -16,14 +15,15 @@ const logoutItem = { icon: 'pi pi-sign-out', title: 'Salir' }
     class="h-svh w-16 border-r border-surface-300 flex flex-col items-center p-4 bg-surface shadow-md"
   >
     <div class="flex flex-col gap-4 flex-grow">
-      <Button
+      <router-link
         v-for="item in menuItems"
         :key="item.icon"
-        :icon="item.icon"
-        class="text-primary-500 hover:text-primary-700 transition"
+        :to="item.path"
+        class="p-button p-button-text text-primary-500 hover:text-primary-700 transition flex items-center gap-2"
         v-tooltip.right="item.title"
-        text
-      />
+      >
+        <i :class="item.icon" />
+      </router-link>
     </div>
     <Button
       :icon="logoutItem.icon"
