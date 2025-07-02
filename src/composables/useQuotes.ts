@@ -96,6 +96,8 @@ export default function useQuotes() {
         await axios.get(`${config.API_URL}/quote`, {
           params: {
             search: searchParam || '',
+            limit: 20,
+            distributed: true,
           },
         })
       ).data

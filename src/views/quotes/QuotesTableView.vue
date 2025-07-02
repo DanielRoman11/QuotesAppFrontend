@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Button from 'primevue/button'
 import Paginator from 'primevue/paginator'
 import Dialog from 'primevue/dialog'
+import axios from 'axios'
+import config from '@/config'
 
 interface QuoteItem {
   id: number | string
@@ -32,7 +33,6 @@ interface Quote {
   items: QuoteItem[]
 }
 
-const router = useRouter()
 const quotes = ref<Quote[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -44,11 +44,22 @@ const showDialog = ref(false)
 async function fetchQuotes(pageNum = 1) {
   loading.value = true
   try {
-    const res = await fetch(`/quotes?page=${pageNum}&limit=${limit.value}`)
-    const data = await res.json()
-    quotes.value = data.data
-    total.value = data.total
-    page.value = data.page
+    const response = (
+      await axios.get(`${config.API_URL}/quote`, {
+        params: {
+          page: pageNum,
+          limit: limit.value,
+          distributed: false,
+        },
+      })
+    ).data
+
+    quotes.value = response.data
+    total.value = response.total
+    page.value = response.page || 1
+  } catch (error: any) {
+    console.error('Error en la petición:', error)
+    console.error('Error response:', error.response)
   } finally {
     loading.value = false
   }
@@ -63,17 +74,13 @@ function showDetails(quote: Quote) {
   showDialog.value = true
 }
 
-function goToCreate() {
-  router.push('/quotes/create')
-}
-
 onMounted(() => {
   fetchQuotes()
 })
 </script>
 
 <template>
-  <div class="p-6 mx-auto w-full max-w-6xl relative">
+  <div class="p-6 mx-auto w-full max-w-6xl">
     <h2 class="text-2xl font-semibold mb-6 text-surface-900 dark:text-surface-0">Quotes List</h2>
     <DataTable :value="quotes" :loading="loading" responsiveLayout="scroll" class="mb-4">
       <Column field="id" header="ID" />
@@ -115,12 +122,5 @@ onMounted(() => {
         </DataTable>
       </div>
     </Dialog>
-
-    <Button
-      icon="pi pi-plus"
-      class="fixed bottom-8 right-8 z-50 !rounded-full !w-16 !h-16 flex items-center justify-center shadow-lg bg-primary-500 hover:bg-primary-600 text-white text-2xl"
-      @click="goToCreate"
-      aria-label="Create New Quote"
-    />
   </div>
 </template>

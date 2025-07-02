@@ -5,7 +5,7 @@ import PrimeVue from 'primevue/config'
 import { createApp } from 'vue'
 import App from './App.vue'
 import { ToastService } from 'primevue'
-import { router } from './utils/router'
+import { router } from './config/router'
 
 const app = createApp(App)
 

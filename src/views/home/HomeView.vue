@@ -22,11 +22,11 @@
 
             <div class="flex items-center gap-4 justify-center lg:justify-start">
               <router-link
-                to="/dashboard"
+                to="/quotes"
                 class="p-button p-button text-primary-500 hover:text-primary-700 transition-all"
               >
                 <i class="pi pi-book text-xl"></i>
-                <span class="ml-2">Create Quotes</span>
+                <span class="ml-2">View Quotes</span>
               </router-link>
               <router-link
                 to="#"
@@ -51,7 +51,3 @@
     </div>
   </div>
 </template>
-
-<script setup>
-import Button from 'primevue/button'
-</script>
