@@ -9,8 +9,8 @@
             <h1
               class="text-4xl xl:text-5xl font-bold text-surface-0 lg:text-surface-900 dark:text-surface-0 mb-6 !leading-tight"
             >
-              <span class="block">Create the quotes your</span>
-              <span class="block text-primary">clients deserve to see</span>
+              <span class="block">Create the quotes</span>
+              <span class="block text-primary">for your clients needs</span>
             </h1>
 
             <p
