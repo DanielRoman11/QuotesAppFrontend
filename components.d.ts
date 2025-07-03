@@ -22,6 +22,8 @@ declare module 'vue' {
     IconField: typeof import('primevue/iconfield')['default']
     InputIcon: typeof import('primevue/inputicon')['default']
     QuotesOverviewWidget: typeof import('./src/components/dashboard/QuotesOverviewWidget.vue')['default']
+    QuotesTableView: typeof import('./src/components/quotes/QuotesTableView.vue')['default']
+    QuotesView: typeof import('./src/components/quotes/QuotesView.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     StatsWidget: typeof import('./src/components/dashboard/StatsWidget.vue')['default']

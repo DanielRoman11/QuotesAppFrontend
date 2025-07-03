@@ -9,6 +9,9 @@ import TabView from 'primevue/tabview'
 import TabPanel from 'primevue/tabpanel'
 import Autocomplete from 'primevue/autocomplete'
 import { useCreateQuote } from '@/composables/useQuotes'
+import { useRouter } from 'vue-router'
+import { watch, ref } from 'vue'
+import Dialog from 'primevue/dialog'
 
 const {
   // Form data
@@ -63,16 +66,78 @@ const {
   getCategorySubtotal,
   totalGeneral,
 } = useCreateQuote()
+
+const router = useRouter()
+
+const showProductModal = ref(false)
+const productSearchInput = ref('')
+const productSearchResults = ref<any[]>([])
+const productSearchLoading = ref(false)
+const selectedProductIdx = ref<number | null>(null)
+
+function goBack() {
+  router.push('/quotes')
+}
+
+watch(showClientDropdown, (val) => {
+  console.log('showClientDropdown:', val)
+})
+
+async function searchProduct() {
+  productSearchLoading.value = true
+  // Simula búsqueda, reemplaza con tu API real
+  const res = await fetch(
+    `${import.meta.env.VITE_API_URL}/product/suggestions?description=${encodeURIComponent(productSearchInput.value)}`,
+  )
+  if (res.ok) {
+    productSearchResults.value = await res.json()
+  } else {
+    productSearchResults.value = []
+  }
+  productSearchLoading.value = false
+}
+
+function openProductModal(idx: number) {
+  selectedProductIdx.value = idx
+  productSearchInput.value = ''
+  productSearchResults.value = []
+  showProductModal.value = true
+}
+
+function selectProductSuggestionInModal(suggestion: any) {
+  if (selectedProductIdx.value !== null) {
+    descriptionInputs.value[selectedProductIdx.value] = suggestion.description
+    descriptionLocked.value[selectedProductIdx.value] = true
+  }
+  showProductModal.value = false
+}
+
+function unlockDescription(idx: number) {
+  descriptionLocked.value[idx] = false
+}
 </script>
 
 <template>
   <div class="p-6 mx-auto w-full max-w-3xl">
-    <h2 class="text-2xl font-semibold mb-6 text-surface-900 dark:text-surface-0">Create Quote</h2>
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-semibold text-surface-900 dark:text-surface-0">Create Quote</h2>
+      <Button
+        label="Regresar"
+        icon="pi pi-arrow-left"
+        @click="goBack"
+        severity="secondary"
+        size="small"
+      />
+    </div>
 
     <div class="grid md:grid-cols-2 gap-4 w-full flex-1">
       <div>
         <label class="block text-surface-700 dark:text-surface-200">Author</label>
-        <InputText v-model="form.author" class="w-full" size="small" />
+        <InputText
+          v-model="form.author"
+          class="w-full text-surface-900 dark:text-surface-0"
+          size="small"
+        />
         <span v-if="errors.author" class="text-red-500 text-xs">{{
           errors.author && 'Author is required.'
         }}</span>
@@ -81,7 +146,7 @@ const {
         <label class="block text-surface-700 dark:text-surface-200">Creation date</label>
         <Calendar
           v-model="form.createdAt"
-          class="w-full"
+          class="w-full text-surface-900 dark:text-surface-0"
           date-format="dd/mm/yy"
           show-icon
           size="small"
@@ -98,7 +163,7 @@ const {
           option-label="label"
           option-value="value"
           placeholder="Select currency"
-          class="w-full"
+          class="w-full text-surface-900 dark:text-surface-0"
           size="small"
         />
         <span v-if="errors.currency" class="text-red-500 text-xs">{{
@@ -113,7 +178,7 @@ const {
           option-label="label"
           option-value="value"
           placeholder="Select approver"
-          class="w-full"
+          class="w-full text-surface-900 dark:text-surface-0"
           size="small"
         />
         <span v-if="errors.approvedBy" class="text-red-500 text-xs">{{
@@ -125,7 +190,7 @@ const {
           <label class="block text-surface-700 dark:text-surface-200">Client (Company)</label>
           <InputText
             v-model="clientInput"
-            class="w-full"
+            class="w-full text-surface-900 dark:text-surface-0"
             size="small"
             @input="onClientInput"
             @focus="onClientFocus"
@@ -135,7 +200,7 @@ const {
           />
           <div
             v-if="showClientDropdown && !clientLocked"
-            class="absolute left-0 top-full w-full z-30 border rounded shadow max-h-60 overflow-auto mt-1 bg-white border-gray-300 dark:bg-surface-800 dark:border-surface-700"
+            class="absolute left-0 top-full w-full z-30 border rounded shadow max-h-60 mt-1 bg-white border-gray-300 dark:bg-surface-800 dark:border-surface-700"
           >
             <div
               v-if="clientLoading"
@@ -228,7 +293,7 @@ const {
                   <label class="block text-surface-700 dark:text-surface-200">Category</label>
                   <InputText
                     v-model="categoryInputs[idx]"
-                    class="max-w-xs w-full"
+                    class="max-w-xs w-full text-surface-900 dark:text-surface-0"
                     size="small"
                     @input="(e: any) => onCategoryInput(e.target.value, idx)"
                     @blur="() => onCategoryBlur(idx)"
@@ -237,62 +302,42 @@ const {
                 <div class="flex flex-col items-start mt-2 w-full relative">
                   <label class="block text-surface-700 dark:text-surface-200">Description</label>
                   <Textarea
-                    v-model="descriptionInputs[form.items.indexOf(item)]"
-                    class="w-full min-h-[100px] text-base"
+                    v-model="descriptionInputs[idx]"
+                    class="w-full min-h-[100px] text-base text-surface-900 dark:text-surface-0"
                     rows="4"
                     autoResize
                     placeholder="Type the full description..."
-                    :disabled="descriptionLocked[form.items.indexOf(item)]"
-                    @input="(e: any) => onTextareaInput(e, form.items.indexOf(item))"
-                    @focus="() => onTextareaFocus(form.items.indexOf(item))"
-                    @blur="() => onTextareaBlur(form.items.indexOf(item))"
+                    :disabled="descriptionLocked[idx]"
+                    @input="(e: any) => onTextareaInput(e, idx)"
+                    @focus="() => onTextareaFocus(idx)"
+                    @blur="() => onTextareaBlur(idx)"
                   />
-                  <button
-                    v-if="descriptionLocked[form.items.indexOf(item)]"
-                    type="button"
-                    class="mt-2 px-3 py-1 rounded bg-gray-200 dark:bg-surface-700 text-gray-700 dark:text-surface-0 text-xs hover:bg-gray-300 dark:hover:bg-surface-600 transition"
-                    @click="() => cancelProductSelection(form.items.indexOf(item))"
-                  >
-                    Cancel selection
-                  </button>
-                  <div
-                    v-if="
-                      showProductDropdown[form.items.indexOf(item)] &&
-                      !descriptionLocked[form.items.indexOf(item)]
-                    "
-                    class="absolute left-0 top-full w-full z-30 border rounded shadow max-h-60 overflow-auto mt-1 bg-white border-gray-300 dark:bg-surface-800 dark:border-surface-700"
-                  >
-                    <div
-                      v-for="s in productSuggestions[form.items.indexOf(item)]"
-                      :key="s.id"
-                      class="px-4 py-2 cursor-pointer hover:bg-primary-100 dark:hover:bg-surface-700 text-surface-900 dark:text-surface-0"
-                      @mousedown.prevent="
-                        () => selectProductSuggestion(s, form.items.indexOf(item))
-                      "
+                  <div class="my-2 flex gap-2">
+                    <button
+                      type="button"
+                      class="flex items-center gap-2 text-primary-700 dark:text-primary-300 text-xs font-medium bg-transparent p-0 shadow-none border px-2 py-1 rounded-sm border-accent cursor-pointer"
+                      @click="openProductModal(idx)"
                     >
-                      {{ s.description }}
-                      <span v-if="s.unit" class="text-xs text-gray-500 dark:text-gray-300 ml-2"
-                        >({{ s.unit }})</span
-                      >
-                    </div>
-                    <div
-                      v-if="productSuggestions[form.items.indexOf(item)]?.length === 0"
-                      class="px-4 py-2 text-gray-400 dark:text-gray-300"
+                      <i class="pi pi-database"></i>
+                      Buscar un producto
+                    </button>
+                    <button
+                      v-if="descriptionLocked[idx]"
+                      type="button"
+                      class="text-xs bg-primary text-primary-contrast font-semibold px-2 py-1 rounded-sm cursor-pointer border-none shadow-sm"
+                      @click="unlockDescription(idx)"
                     >
-                      No suggestions
-                    </div>
+                      Desbloquear
+                    </button>
                   </div>
                   <span
                     v-if="
                       errors.itemsFields &&
-                      errors.itemsFields[form.items.indexOf(item)] &&
-                      errors.itemsFields[form.items.indexOf(item)].description
+                      errors.itemsFields[idx] &&
+                      errors.itemsFields[idx].description
                     "
                     class="text-red-500 text-xs"
-                    >{{
-                      errors.itemsFields[form.items.indexOf(item)].description &&
-                      'Description is required.'
-                    }}</span
+                    >{{ errors.itemsFields[idx].description && 'Description is required.' }}</span
                   >
                 </div>
                 <div class="grid md:grid-cols-3 gap-4 mt-2">
@@ -300,28 +345,25 @@ const {
                     <label class="block text-surface-700 dark:text-surface-200">Quantity</label>
                     <InputNumber
                       v-model="item.quantity"
-                      class="max-w-xs w-full"
+                      class="max-w-xs w-full text-surface-900 dark:text-surface-0"
                       :min="1"
                       size="small"
                     />
                     <span
                       v-if="
                         errors.itemsFields &&
-                        errors.itemsFields[form.items.indexOf(item)] &&
-                        errors.itemsFields[form.items.indexOf(item)].quantity
+                        errors.itemsFields[idx] &&
+                        errors.itemsFields[idx].quantity
                       "
                       class="text-red-500 text-xs"
-                      >{{
-                        errors.itemsFields[form.items.indexOf(item)].quantity &&
-                        'Quantity is required (>0).'
-                      }}</span
+                      >{{ errors.itemsFields[idx].quantity && 'Quantity is required (>0).' }}</span
                     >
                   </div>
                   <div class="flex flex-col items-start">
                     <label class="block text-surface-700 dark:text-surface-200">Price</label>
                     <InputNumber
                       v-model="item.price"
-                      class="max-w-xs w-full"
+                      class="max-w-xs w-full text-surface-900 dark:text-surface-0"
                       mode="currency"
                       :currency="form.currency || 'USD'"
                       :minFractionDigits="2"
@@ -330,37 +372,32 @@ const {
                     <span
                       v-if="
                         errors.itemsFields &&
-                        errors.itemsFields[form.items.indexOf(item)] &&
-                        errors.itemsFields[form.items.indexOf(item)].price
+                        errors.itemsFields[idx] &&
+                        errors.itemsFields[idx].price
                       "
                       class="text-red-500 text-xs"
-                      >{{
-                        errors.itemsFields[form.items.indexOf(item)].price &&
-                        'Price is required (>0).'
-                      }}</span
+                      >{{ errors.itemsFields[idx].price && 'Price is required (>0).' }}</span
                     >
                   </div>
                   <div class="flex flex-col items-start">
                     <label class="block text-surface-700 dark:text-surface-200">Unit</label>
                     <Autocomplete
                       v-model="item.product.unit"
-                      :suggestions="unitFiltered[form.items.indexOf(item)]"
-                      @complete="(e) => searchUnit(e, form.items.indexOf(item))"
-                      class="max-w-xs w-full"
+                      :suggestions="unitFiltered[idx]"
+                      @complete="(e: any) => searchUnit(e, idx)"
+                      class="max-w-xs w-full text-surface-900 dark:text-surface-0"
                       placeholder="Unit"
                       size="small"
-                      :disabled="descriptionLocked[form.items.indexOf(item)]"
+                      :disabled="descriptionLocked[idx]"
                     />
                     <span
                       v-if="
                         errors.itemsFields &&
-                        errors.itemsFields[form.items.indexOf(item)] &&
-                        errors.itemsFields[form.items.indexOf(item)].unit
+                        errors.itemsFields[idx] &&
+                        errors.itemsFields[idx].unit
                       "
                       class="text-red-500 text-xs"
-                      >{{
-                        errors.itemsFields[form.items.indexOf(item)].unit && 'Unit is required.'
-                      }}</span
+                      >{{ errors.itemsFields[idx].unit && 'Unit is required.' }}</span
                     >
                   </div>
                 </div>
@@ -370,7 +407,7 @@ const {
                   <Button
                     icon="pi pi-trash"
                     label="Remove"
-                    @click="() => removeItem(form.items.indexOf(item))"
+                    @click="() => removeItem(idx)"
                     text
                     severity="danger"
                     size="small"
@@ -403,4 +440,37 @@ const {
       />
     </div>
   </div>
+
+  <Dialog
+    v-model:visible="showProductModal"
+    modal
+    header="Buscar producto"
+    :closable="true"
+    :style="{ width: '500px', maxWidth: '90vw', overflow: 'visible' }"
+  >
+    <div class="flex flex-col gap-4 overflow-visible">
+      <div class="relative">
+        <Autocomplete
+          v-model="productSearchInput"
+          :suggestions="productSearchResults"
+          option-label="description"
+          placeholder="Buscar producto..."
+          class="w-full text-surface-900 dark:text-surface-0"
+          @complete="searchProduct"
+          @item-select="(e) => selectProductSuggestionInModal(e.value)"
+          :dropdown="true"
+          :loading="productSearchLoading"
+        >
+          <template #option="slotProps">
+            <div class="flex items-center">
+              <span>{{ slotProps.option.description }}</span>
+              <span v-if="slotProps.option.unit" class="text-xs text-gray-500 ml-2"
+                >({{ slotProps.option.unit }})</span
+              >
+            </div>
+          </template>
+        </Autocomplete>
+      </div>
+    </div>
+  </Dialog>
 </template>

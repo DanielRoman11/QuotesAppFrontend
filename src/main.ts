@@ -1,9 +1,9 @@
 import './assets/styles/main.css'
 
-import Material from '@primeuix/themes/material'
+import App from '@/App.vue'
+import Aura from '@primeuix/themes/aura'
 import PrimeVue from 'primevue/config'
 import { createApp } from 'vue'
-import App from './App.vue'
 import { ToastService } from 'primevue'
 import { router } from './config/router'
 
@@ -11,9 +11,10 @@ const app = createApp(App)
 
 app.use(PrimeVue, {
   theme: {
-    preset: Material,
+    preset: Aura,
     options: {
       darkModeSelector: '.p-dark',
+      cssLayer: false,
     },
   },
 })

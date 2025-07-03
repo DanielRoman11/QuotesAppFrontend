@@ -15,5 +15,5 @@ import { ScrollPanel, Toast } from 'primevue'
       <AppFooter />
     </ScrollPanel>
   </section>
-  <Toast position="bottom-right" />
+  <Toast position="top-right" />
 </template>

@@ -2,7 +2,7 @@
 import useQuotes from '@/composables/useQuotes'
 import { formatCurrency, formatDate } from '@/utils/common'
 import { Column, DataTable, Dialog, InputNumber, InputText, Tag } from 'primevue'
-import { Currency, ApprovedBy, QuoteStatus } from '@/utils/interfaces'
+import { Currency, ApprovedBy, QuoteStatus } from '@/utils/enums'
 
 const {
   errors,
