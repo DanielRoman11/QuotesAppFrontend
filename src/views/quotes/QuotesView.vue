@@ -41,19 +41,26 @@ interface Quote {
 const router = useRouter()
 const quotes = ref<Quote[]>([])
 const total = ref(0)
+const totalPages = ref(0)
 const page = ref(1)
-const limit = ref(10)
+const limit = ref(5)
 const first = ref(0)
+const last = ref(0)
 const loading = ref(false)
+const hasNext = ref(false)
+const hasPrev = ref(false)
 const selectedQuote = ref<Quote | null>(null)
 const showDialog = ref(false)
 const searchTerm = ref('')
 const statusFilter = ref('')
 const priorityFilter = ref('')
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
+const showStatusCard = ref(false)
+const showPriorityCard = ref(false)
 const toast = useToast()
 const confirmDeleteDialog = ref(false)
 const quoteIdToDelete = ref<string | null>(null)
+
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
 
 const statusOptions = [
   { label: 'Todos', value: '' },
@@ -68,32 +75,6 @@ const priorityOptions = [
   { label: 'Baja', value: 'Baja' },
 ]
 
-function getStatusSeverity(status: string) {
-  switch (status.toLowerCase()) {
-    case 'approved':
-      return 'success'
-    case 'pending':
-      return 'warning'
-    case 'rejected':
-      return 'danger'
-    default:
-      return 'info'
-  }
-}
-
-function getPrioritySeverity(priority: string) {
-  switch (priority.toLowerCase()) {
-    case 'high':
-      return 'danger'
-    case 'medium':
-      return 'warning'
-    case 'low':
-      return 'success'
-    default:
-      return 'info'
-  }
-}
-
 async function fetchQuotes() {
   loading.value = true
   try {
@@ -107,8 +88,16 @@ async function fetchQuotes() {
       })
     ).data
 
-    quotes.value = response.data
+    // Forzar reactividad asignando un nuevo array
+    quotes.value = [...response.data]
     total.value = response.total
+    totalPages.value = response.totalPages
+    page.value = response.page
+    limit.value = response.limit
+    first.value = (response.page - 1) * response.limit
+    last.value = Math.min(first.value + response.limit, response.total)
+    hasNext.value = response.hasNext
+    hasPrev.value = response.hasPrev
   } catch (error) {
     loading.value = false
     console.log('Algo salió mal', error)
@@ -126,9 +115,53 @@ const filteredQuotes = computed(() => {
 })
 
 function onPageChange(event: any) {
-  limit.value = event.rows
-  page.value = event.page + 1
   first.value = event.first
+  page.value = Math.floor(event.first / event.rows) + 1
+  limit.value = event.rows
+  last.value = Math.min(first.value + limit.value, total.value)
+  fetchQuotes()
+}
+
+function goToFirstPage() {
+  if (page.value > 1) {
+    page.value = 1
+    first.value = 0
+    last.value = Math.min(limit.value, total.value)
+    fetchQuotes()
+  }
+}
+
+function goToPrevPage() {
+  if (page.value > 1) {
+    page.value--
+    first.value -= limit.value
+    last.value = Math.min(first.value + limit.value, total.value)
+    fetchQuotes()
+  }
+}
+
+function goToNextPage() {
+  if (page.value < totalPages.value) {
+    page.value++
+    first.value += limit.value
+    last.value = Math.min(first.value + limit.value, total.value)
+    fetchQuotes()
+  }
+}
+
+function goToLastPage() {
+  if (page.value < totalPages.value) {
+    page.value = totalPages.value
+    first.value = (totalPages.value - 1) * limit.value
+    last.value = total.value
+    fetchQuotes()
+  }
+}
+
+function onLimitChange() {
+  page.value = 1
+  first.value = 0
+  last.value = Math.min(limit.value, total.value)
   fetchQuotes()
 }
 
@@ -137,22 +170,11 @@ function showDetails(quote: Quote) {
   showDialog.value = true
 }
 
-function goToCreate() {
-  router.push('/quotes/create')
-}
-
-function clearFilters() {
-  searchTerm.value = ''
-  statusFilter.value = ''
-  priorityFilter.value = ''
-  page.value = 1
-  first.value = 0
-  fetchQuotes()
-}
-
 function applyFilters() {
+  // Solo aplica búsqueda al backend, los filtros de estado y prioridad son frontend
   page.value = 1
   first.value = 0
+  last.value = Math.min(limit.value, total.value)
   fetchQuotes()
 }
 
@@ -164,6 +186,19 @@ watch(searchTerm, () => {
     fetchQuotes()
   }, 1000)
 })
+
+// Watchers para filtros frontend (no afectan la paginación)
+watch(statusFilter, () => {
+  // Solo filtrado local, no fetch
+})
+
+watch(priorityFilter, () => {
+  // Solo filtrado local, no fetch
+})
+
+function goToCreate() {
+  router.push('/quotes/create')
+}
 
 async function deleteQuote(quoteId: string) {
   const prevQuotes = [...quotes.value]
@@ -222,20 +257,25 @@ onMounted(() => {
 
 <template>
   <div class="p-4">
-    <Card class="mb-4">
+    <Card class="mb-4 rounded-3xl border-0 shadow-none">
       <template #title>
         <div class="flex items-center gap-3 justify-between">
           <div class="flex items-center gap-3">
             <span class="text-2xl font-semibold text-primary">Gestión de Cotizaciones</span>
-            <span
-              class="inline-block px-2 py-1 rounded bg-primary text-white text-xs font-bold ml-2"
-              >{{ total }}</span
-            >
+            <div class="flex items-center gap-2">
+              <span
+                class="inline-block px-2 py-1 rounded bg-primary text-white text-xs font-bold"
+                >{{ total }}</span
+              >
+              <span class="text-sm text-surface-600 dark:text-surface-400">
+                (Página {{ page }}/{{ totalPages }})
+              </span>
+            </div>
           </div>
           <Button
             label="Añadir cotización"
             icon="pi pi-plus"
-            class="bg-primary text-white hover:bg-primary-700"
+            class="bg-primary text-primary-contrast hover:bg-primary-700"
             @click="goToCreate"
           />
         </div>
@@ -243,106 +283,171 @@ onMounted(() => {
 
       <template #content>
         <!-- Filtros -->
-        <div class="mb-6 p-4 surface-50 dark:surface-800 rounded-lg">
-          <h3 class="text-lg font-medium mb-4 text-primary">
+        <div class="mb-6 p-4 bg-white dark:bg-surface-800 rounded-3xl shadow-none">
+          <h3 class="text-lg font-medium mb-4 text-primary flex items-center gap-2">
             <i class="pi pi-filter mr-2"></i>Filtros
           </h3>
-          <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div class="flex flex-col">
-              <label class="mb-2 text-sm font-medium text-surface-700 dark:text-surface-300"
-                >Buscar</label
-              >
+          <div class="flex items-center justify-between gap-4">
+            <!-- Filtros con iconos -->
+            <div class="flex items-center gap-6">
+              <!-- Filtro de Estado -->
+              <div class="relative">
+                <button
+                  @click="showStatusCard = !showStatusCard"
+                  class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
+                >
+                  <span class="text-sm font-medium text-surface-700 dark:text-surface-300"
+                    >Estado</span
+                  >
+                  <i class="pi pi-filter text-primary"></i>
+                </button>
+
+                <!-- Mini card con dropdown -->
+                <div
+                  v-if="showStatusCard"
+                  class="absolute top-full left-0 mt-2 p-3 bg-white dark:bg-surface-800 rounded-xl shadow-lg border border-surface-200 dark:border-surface-700 z-50 min-w-48"
+                >
+                  <Dropdown
+                    v-model="statusFilter"
+                    :options="statusOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Seleccionar estado"
+                    class="w-full"
+                    :showClear="true"
+                  />
+                </div>
+              </div>
+
+              <!-- Filtro de Prioridad -->
+              <div class="relative">
+                <button
+                  @click="showPriorityCard = !showPriorityCard"
+                  class="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
+                >
+                  <span class="text-sm font-medium text-surface-700 dark:text-surface-300"
+                    >Prioridad</span
+                  >
+                  <i class="pi pi-filter text-primary"></i>
+                </button>
+
+                <!-- Mini card con dropdown -->
+                <div
+                  v-if="showPriorityCard"
+                  class="absolute top-full left-0 mt-2 p-3 bg-white dark:bg-surface-800 rounded-xl shadow-lg border border-surface-200 dark:border-surface-700 z-50 min-w-48"
+                >
+                  <Dropdown
+                    v-model="priorityFilter"
+                    :options="priorityOptions"
+                    optionLabel="label"
+                    optionValue="value"
+                    placeholder="Seleccionar prioridad"
+                    class="w-full"
+                    :showClear="true"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- Buscador al final -->
+            <div class="flex items-center gap-2">
               <InputText
                 v-model="searchTerm"
-                placeholder="Buscar por ID, cliente o autor..."
-                class="w-full"
+                placeholder="Buscar palabra clave..."
+                class="w-64 rounded-2xl border-0 focus:ring-1 focus:ring-primary/30 bg-transparent"
                 @keyup.enter="applyFilters"
-              />
-            </div>
-            <div class="flex flex-col">
-              <label class="mb-2 text-sm font-medium text-surface-700 dark:text-surface-300"
-                >Estado</label
-              >
-              <Dropdown
-                v-model="statusFilter"
-                :options="statusOptions"
-                optionLabel="label"
-                optionValue="value"
-                placeholder="Seleccionar estado"
-                class="w-full"
-              />
-            </div>
-            <div class="flex flex-col">
-              <label class="mb-2 text-sm font-medium text-surface-700 dark:text-surface-300"
-                >Prioridad</label
-              >
-              <Dropdown
-                v-model="priorityFilter"
-                :options="priorityOptions"
-                optionLabel="label"
-                optionValue="value"
-                placeholder="Seleccionar prioridad"
-                class="w-full"
-              />
-            </div>
-            <div class="flex items-end gap-2">
-              <Button
-                label="Aplicar"
-                icon="pi pi-search"
-                @click="applyFilters"
-                class="flex-1 bg-primary text-white hover:bg-primary-700"
-              />
-              <Button
-                label="Limpiar"
-                icon="pi pi-times"
-                severity="secondary"
-                @click="clearFilters"
-                class="flex-1 bg-secondary text-white hover:bg-secondary-700"
               />
             </div>
           </div>
         </div>
 
         <!-- Tabla de cotizaciones -->
-        <div class="overflow-x-auto">
+        <div class="p-4 rounded-3xl border border-surface-200 dark:border-surface-800">
           <DataTable
+            scrollable
+            stripedRows
+            scrollDirection="horizontal"
             :value="filteredQuotes"
             :loading="loading"
-            responsiveLayout="scroll"
-            class="mb-4 w-full whitespace-nowrap"
-            stripedRows
-            showGridlines
-            paginator
-            :rows="limit"
-            :totalRecords="total"
-            :first="first"
-            @page="onPageChange"
-            paginatorTemplate="FirstPageLink PrevPageLink PageLinks NextPageLink LastPageLink CurrentPageReport RowsPerPageDropdown"
-            :rowsPerPageOptions="[5, 10, 20, 50]"
-            currentPageReportTemplate="Mostrando {first} a {last} de {totalRecords} cotizaciones"
-            scrollable
-            scrollDirection="horizontal"
+            class="whitespace-nowrap"
           >
-            <Column header="Acciones" style="width: 120px">
+            <template #paginatorstart>
+              <div class="flex items-center gap-2">
+                <Button
+                  type="button"
+                  icon="pi pi-angle-double-left"
+                  text
+                  :disabled="page === 1"
+                  @click="goToFirstPage"
+                />
+                <Button
+                  type="button"
+                  icon="pi pi-angle-left"
+                  text
+                  :disabled="page === 1"
+                  @click="goToPrevPage"
+                />
+                <span class="text-sm text-surface-600 dark:text-surface-400">
+                  Página {{ page }} de {{ totalPages }}
+                </span>
+                <Button
+                  type="button"
+                  icon="pi pi-angle-right"
+                  text
+                  :disabled="page === totalPages"
+                  @click="goToNextPage"
+                />
+                <Button
+                  type="button"
+                  icon="pi pi-angle-double-right"
+                  text
+                  :disabled="page === totalPages"
+                  @click="goToLastPage"
+                />
+              </div>
+            </template>
+            <template #paginatorend>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-surface-600 dark:text-surface-400">
+                  Filas por página:
+                </span>
+                <Dropdown
+                  v-model="limit"
+                  :options="[5, 10, 20, 50]"
+                  class="w-32"
+                  @change="onLimitChange"
+                />
+                <span class="text-sm text-surface-600 dark:text-surface-400">
+                  {{ first + 1 }} a {{ last }} de {{ total }}
+                </span>
+              </div>
+            </template>
+            <Column header="Acciones" style="width: 100px">
               <template #body="{ data }">
                 <div class="flex gap-2">
                   <Button
                     icon="pi pi-eye"
                     size="small"
-                    severity="info"
+                    text
+                    rounded
+                    class="hover:bg-primary/10 text-primary transition-colors duration-150"
                     @click="showDetails(data)"
                     v-tooltip.top="'Ver detalles'"
                   />
                   <Button
                     icon="pi pi-pencil"
                     size="small"
-                    severity="warning"
+                    text
+                    rounded
+                    class="hover:bg-warning/10 text-warning transition-colors duration-150"
                     v-tooltip.top="'Editar'"
                   />
                   <Button
                     icon="pi pi-trash"
                     size="small"
-                    severity="danger"
+                    text
+                    rounded
+                    class="hover:bg-danger/10 text-danger transition-colors duration-150"
                     v-tooltip.top="'Eliminar'"
                     @click="askDeleteQuote(data.id)"
                   />
@@ -442,6 +547,58 @@ onMounted(() => {
               </template>
             </Column>
           </DataTable>
+
+          <!-- Paginación manual -->
+          <div class="mt-4 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Button
+                type="button"
+                icon="pi pi-angle-double-left"
+                text
+                :disabled="page === 1"
+                @click="goToFirstPage"
+              />
+              <Button
+                type="button"
+                icon="pi pi-angle-left"
+                text
+                :disabled="page === 1"
+                @click="goToPrevPage"
+              />
+              <span class="text-sm text-surface-600 dark:text-surface-400">
+                Página {{ page }} de {{ totalPages }}
+              </span>
+              <Button
+                type="button"
+                icon="pi pi-angle-right"
+                text
+                :disabled="page === totalPages"
+                @click="goToNextPage"
+              />
+              <Button
+                type="button"
+                icon="pi pi-angle-double-right"
+                text
+                :disabled="page === totalPages"
+                @click="goToLastPage"
+              />
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-surface-600 dark:text-surface-400">
+                Filas por página:
+              </span>
+              <Dropdown
+                v-model="limit"
+                :options="[5, 10, 20, 50]"
+                class="w-32"
+                @change="onLimitChange"
+              />
+              <span class="text-sm text-surface-600 dark:text-surface-400">
+                {{ first + 1 }} a {{ last }} de {{ total }}
+              </span>
+            </div>
+          </div>
         </div>
       </template>
     </Card>
@@ -451,13 +608,14 @@ onMounted(() => {
       v-model:visible="showDialog"
       modal
       header="Detalles de la Cotización"
-      :style="{ width: '70vw' }"
+      :style="{ width: '70vw', borderRadius: '2rem' }"
       :closable="true"
       :draggable="false"
+      class="rounded-3xl"
     >
       <div v-if="selectedQuote" class="space-y-6">
         <!-- Información general -->
-        <Card>
+        <Card class="rounded-3xl border-0 shadow-none">
           <template #title>
             <div class="flex items-center gap-2">
               <i class="pi pi-info-circle text-primary"></i>
@@ -478,7 +636,7 @@ onMounted(() => {
                 <label class="text-sm font-medium text-surface-600">Cliente:</label>
                 <p>{{ selectedQuote.client.companyName }}</p>
               </div>
-              <div>
+              <div class="flex flex-col *:w-fit">
                 <label class="text-sm font-medium text-surface-600">Estado:</label>
                 <span
                   v-if="selectedQuote.status === 'En Progreso'"
@@ -496,7 +654,7 @@ onMounted(() => {
         </Card>
 
         <!-- Items de la cotización -->
-        <Card>
+        <Card class="rounded-3xl border-0 shadow-none">
           <template #title>
             <div class="flex items-center gap-2">
               <i class="pi pi-list text-primary"></i>
@@ -509,7 +667,6 @@ onMounted(() => {
                 :value="selectedQuote.items"
                 responsiveLayout="scroll"
                 stripedRows
-                showGridlines
                 scrollable
                 scrollHeight="300px"
                 scrollDirection="both"
@@ -521,6 +678,14 @@ onMounted(() => {
                       class="inline-block px-2 py-1 rounded bg-primary text-primary-contrast text-xs font-bold"
                       >{{ data.id }}</span
                     >
+                  </template>
+                </Column>
+                <Column field="product.description" header="Descripción" style="min-width: 200px">
+                  <template #body="{ data }">
+                    <div class="flex flex-col">
+                      <span class="font-medium">{{ data.product.description }}</span>
+                      <span class="text-sm text-surface-500">Unidad: {{ data.product.unit }}</span>
+                    </div>
                   </template>
                 </Column>
                 <Column field="category" header="Categoría" sortable style="width: 150px">
@@ -546,14 +711,6 @@ onMounted(() => {
                     </span>
                   </template>
                 </Column>
-                <Column field="product.description" header="Descripción" style="min-width: 200px">
-                  <template #body="{ data }">
-                    <div class="flex flex-col">
-                      <span class="font-medium">{{ data.product.description }}</span>
-                      <span class="text-sm text-surface-500">Unidad: {{ data.product.unit }}</span>
-                    </div>
-                  </template>
-                </Column>
                 <Column header="Subtotal" style="width: 120px">
                   <template #body="{ data }">
                     <span class="font-bold text-success">
@@ -576,6 +733,8 @@ onMounted(() => {
       modal
       header="Confirmar eliminación"
       :closable="false"
+      :draggable="false"
+      class="rounded-3xl"
     >
       <div class="py-4">
         <span
