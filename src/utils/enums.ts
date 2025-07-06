@@ -10,6 +10,6 @@ export enum QuoteStatus {
 }
 
 export enum ApprovedBy {
-  technicalManagement = 'JOSE GUILLERMO MORA PINILLA',
-  generalManagement = 'CLAUDIA MILENA ROMÁN HENAO',
+	technicalManagement = 'JOSE GUILLERMO MORA PINILLA',
+	generalManagement = 'CLAUDIA MILENA ROMÁN HENAO',
 }

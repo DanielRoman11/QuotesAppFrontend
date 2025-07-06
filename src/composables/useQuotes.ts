@@ -1,8 +1,10 @@
 import config from '@/config'
+import { ApprovedBy } from '@/utils/enums'
 import axios from 'axios'
 import BigNumber from 'bignumber.js'
 import { useToast } from 'primevue'
 import { onMounted, ref, watch, computed } from 'vue'
+import { useRouter } from 'vue-router'
 
 export default function useQuotes() {
   const toast = useToast()
@@ -92,7 +94,7 @@ export default function useQuotes() {
   // --- Funciones de API y manejo de datos ---
   async function getQuotes(searchParam?: string) {
     try {
-      const response = (
+      const data = (
         await axios.get(`${config.API_URL}/quote`, {
           params: {
             search: searchParam || '',
@@ -102,7 +104,7 @@ export default function useQuotes() {
         })
       ).data
 
-      quotes.value = response.data
+      quotes.value = data.data
     } catch (err) {
       console.error(err)
     }
@@ -190,20 +192,18 @@ export default function useQuotes() {
 }
 
 export function useCreateQuote() {
+  const toast = useToast()
+  const router = useRouter()
   // --- Formulario principal ---
   const currencies = [
     { label: 'USD', value: 'USD' },
     { label: 'EUR', value: 'EUR' },
     { label: 'COP', value: 'COP' },
   ]
-  const units = [
-    { label: 'Unit', value: 'unit' },
-    { label: 'Box', value: 'box' },
-    { label: 'Package', value: 'package' },
-  ]
+
   const approvedByOptions = [
-    { label: 'Technical Management (JOSE GUILLERMO MORA)', value: 'JOSE GUILLERMO MORA' },
-    { label: 'General Management (CLAUDIA MILENA ROMÁN)', value: 'CLAUDIA MILENA ROMÁN' },
+    { label: 'Technical Management (JOSE GUILLERMO MORA)', value: ApprovedBy.technicalManagement },
+    { label: 'General Management (CLAUDIA MILENA ROMÁN)', value: ApprovedBy.generalManagement },
   ]
   const form = ref({
     author: '',
@@ -218,7 +218,7 @@ export function useCreateQuote() {
       {
         quantity: null as number | null,
         price: null as number | null,
-        category: '',
+        category: undefined as string | undefined,
         product: {
           description: '',
           unit: null as string | null,
@@ -242,9 +242,9 @@ export function useCreateQuote() {
     form.value.items.forEach((item, idx) => {
       const itemErr: any = {}
       if (!item.quantity || item.quantity <= 0) itemErr.quantity = 'Quantity is required (>0).'
-      if (!item.price || item.price <= 0) itemErr.price = 'Price is required (>0).'
       if (!item.product.description) itemErr.description = 'Description is required.'
       if (!item.product.unit) itemErr.unit = 'Unit is required.'
+      // Price y category son opcionales según el backend
       err.itemsFields[idx] = itemErr
     })
     errors.value = err
@@ -256,24 +256,11 @@ export function useCreateQuote() {
   const isFormValid = computed(() => validateForm())
 
   // --- Manejo de items ---
-  function addItem() {
-    form.value.items.push({
-      quantity: null,
-      price: null,
-      category: '',
-      product: {
-        description: '',
-        unit: null,
-        id: undefined,
-      },
-    })
-  }
-
   function addItemToCategory(category: string) {
     form.value.items.push({
       quantity: null,
       price: null,
-      category: category === 'No category' ? '' : category,
+      category: category === 'No category' ? undefined : category,
       product: {
         description: '',
         unit: null,
@@ -306,12 +293,12 @@ export function useCreateQuote() {
     categoryInputs.value[idx] = val
     clearTimeout(categoryTimeouts.value[idx])
     categoryTimeouts.value[idx] = setTimeout(() => {
-      form.value.items[idx].category = val
+      form.value.items[idx].category = val.trim() || undefined
     }, 1000)
   }
   function onCategoryBlur(idx: number) {
     clearTimeout(categoryTimeouts.value[idx])
-    form.value.items[idx].category = categoryInputs.value[idx]
+    form.value.items[idx].category = categoryInputs.value[idx].trim() || undefined
   }
   const getCategories = computed(() => {
     const cats = form.value.items.map((i) => i.category?.trim() || 'No category')
@@ -347,16 +334,15 @@ export function useCreateQuote() {
     clientLoading.value = true
     clientSearchTimeout.value = setTimeout(async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/client/suggestions?companyName=${encodeURIComponent(val)}`,
-        )
-        if (res.ok) {
-          clientSuggestions.value = await res.json()
-          showClientDropdown.value = true
-        } else {
-          clientSuggestions.value = []
-          showClientDropdown.value = true
-        }
+        const data = (
+          await axios.get(`${import.meta.env.VITE_API_URL}/client/suggestions`, {
+            params: {
+              companyName: encodeURIComponent(val),
+            },
+          })
+        ).data
+        clientSuggestions.value = data
+        showClientDropdown.value = true
       } catch {
         clientSuggestions.value = []
         showClientDropdown.value = true
@@ -384,13 +370,9 @@ export function useCreateQuote() {
     }, 200)
   }
 
-  // --- Productos (autocompletado en descripción) ---
+  // --- Productos (descripción) ---
   const descriptionInputs = ref<string[]>([])
   const descriptionLocked = ref<boolean[]>([])
-  const productSuggestions = ref<any[][]>([])
-  const showProductDropdown = ref<boolean[]>([])
-  const productLoading = ref<boolean[]>([])
-  const productSearchTimeoutsTextarea = ref<any[]>([])
   watch(
     () => form.value.items.length,
     (newLen) => {
@@ -398,12 +380,6 @@ export function useCreateQuote() {
       while (descriptionInputs.value.length > newLen) descriptionInputs.value.pop()
       while (descriptionLocked.value.length < newLen) descriptionLocked.value.push(false)
       while (descriptionLocked.value.length > newLen) descriptionLocked.value.pop()
-      while (productSuggestions.value.length < newLen) productSuggestions.value.push([])
-      while (productSuggestions.value.length > newLen) productSuggestions.value.pop()
-      while (showProductDropdown.value.length < newLen) showProductDropdown.value.push(false)
-      while (showProductDropdown.value.length > newLen) showProductDropdown.value.pop()
-      while (productLoading.value.length < newLen) productLoading.value.push(false)
-      while (productLoading.value.length > newLen) productLoading.value.pop()
       // Inicializa los valores si no están
       form.value.items.forEach((item, idx) => {
         if (!descriptionInputs.value[idx])
@@ -422,57 +398,6 @@ export function useCreateQuote() {
       form.value.items[idx].product.id = undefined
       descriptionLocked.value[idx] = false
     }
-    searchProductTextarea(val, idx)
-  }
-  function selectProductSuggestion(suggestion: any, idx: number) {
-    form.value.items[idx].product.description = suggestion.description
-    form.value.items[idx].product.unit = suggestion.unit
-    form.value.items[idx].product.id = suggestion.id
-    descriptionInputs.value[idx] = suggestion.description
-    descriptionLocked.value[idx] = true
-    showProductDropdown.value[idx] = false
-  }
-  function cancelProductSelection(idx: number) {
-    form.value.items[idx].product.id = undefined
-    descriptionLocked.value[idx] = false
-  }
-  function onTextareaFocus(idx: number) {
-    if (productSuggestions.value[idx]?.length > 0) {
-      showProductDropdown.value[idx] = true
-    }
-  }
-  function onTextareaBlur(idx: number) {
-    setTimeout(() => {
-      showProductDropdown.value[idx] = false
-    }, 200)
-  }
-  async function searchProductTextarea(val: string, idx: number) {
-    clearTimeout(productSearchTimeoutsTextarea.value[idx])
-    if (!val || val.length < 2) {
-      productSuggestions.value[idx] = []
-      showProductDropdown.value[idx] = false
-      productLoading.value[idx] = false
-      return
-    }
-    productLoading.value[idx] = true
-    productSearchTimeoutsTextarea.value[idx] = setTimeout(async () => {
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/product/suggestions?description=${encodeURIComponent(val)}`,
-        )
-        if (res.ok) {
-          productSuggestions.value[idx] = await res.json()
-          showProductDropdown.value[idx] = true
-        } else {
-          productSuggestions.value[idx] = []
-          showProductDropdown.value[idx] = true
-        }
-      } catch {
-        productSuggestions.value[idx] = []
-        showProductDropdown.value[idx] = true
-      }
-      productLoading.value[idx] = false
-    }, 2000)
   }
 
   // --- Unidad (autocompletado) ---
@@ -489,6 +414,62 @@ export function useCreateQuote() {
   function searchUnit(event: { query: string }, idx: number) {
     const query = event.query.toLowerCase()
     unitFiltered.value[idx] = unitSuggestions.filter((u) => u.toLowerCase().includes(query))
+  }
+
+  // --- Modal de productos ---
+  const showProductModal = ref(false)
+  const productSearchInput = ref('')
+  const productSearchResults = ref<any[]>([])
+  const productSearchLoading = ref(false)
+  const selectedProductIdx = ref<number | null>(null)
+
+  async function searchProduct() {
+    productSearchLoading.value = true
+    try {
+      const response = (
+        await axios.get(`${import.meta.env.VITE_API_URL}/product/suggestions`, {
+          params: { description: encodeURIComponent(productSearchInput.value) },
+        })
+      ).data
+      productSearchResults.value = response
+    } catch (error) {
+      productSearchResults.value = []
+    } finally {
+      productSearchLoading.value = false
+    }
+  }
+
+  function openProductModal(idx: number) {
+    selectedProductIdx.value = idx
+    productSearchInput.value = ''
+    productSearchResults.value = []
+    showProductModal.value = true
+  }
+
+  function selectProductSuggestionInModal(suggestion: any) {
+    if (selectedProductIdx.value !== null) {
+      const idx = selectedProductIdx.value
+
+      // Actualizar la descripción
+      descriptionInputs.value[idx] = suggestion.description
+      form.value.items[idx].product.description = suggestion.description
+
+      // Actualizar la unidad si existe
+      if (suggestion.unit) {
+        form.value.items[idx].product.unit = suggestion.unit
+      }
+
+      // Guardar el ID del producto
+      form.value.items[idx].product.id = suggestion.id
+
+      // Bloquear la descripción
+      descriptionLocked.value[idx] = true
+    }
+    showProductModal.value = false
+  }
+
+  function unlockDescription(idx: number) {
+    descriptionLocked.value[idx] = false
   }
 
   // --- Subtotales y total ---
@@ -509,33 +490,34 @@ export function useCreateQuote() {
   async function submitForm() {
     if (!validateForm()) return
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/quote`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form.value),
+      const data = (await axios.post(`${import.meta.env.VITE_API_URL}/quote`, form.value)).data
+      toast.add({
+        severity: 'success',
+        summary: 'Cotización Creada',
+        detail: `La cotización ${data.id} se ha generado de manera exitosa. Con el estado "${data.status}"`,
+        life: 3000,
       })
-      if (res.ok) {
-        console.log('Quote created successfully')
-        // Aquí puedes mostrar un toast de éxito
-      } else {
-        const error = await res.text()
-        console.error('Error creating quote:', error)
-        // Aquí puedes mostrar un toast de error
-      }
-    } catch (err) {
+      setTimeout(() => {
+        router.push('/quotes')
+      }, 3000)
+    } catch (err: any) {
+      console.error(err.response.data.message)
       console.error('Error creating quote:', err)
-      // Aquí puedes mostrar un toast de error
+      toast.add({
+        severity: 'error',
+        summary: 'Error al crear una cotización',
+        detail: `Hubieron errores en ${err.response.data.message.join(', ')}`,
+        life: 3000,
+      })
     }
   }
 
   return {
     form,
     currencies,
-    units,
     approvedByOptions,
     errors,
     isFormValid,
-    addItem,
     addItemToCategory,
     removeItem,
     categoryInputs,
@@ -554,17 +536,18 @@ export function useCreateQuote() {
     onClientBlur,
     descriptionInputs,
     descriptionLocked,
-    productSuggestions,
-    showProductDropdown,
-    productLoading,
     onTextareaInput,
-    selectProductSuggestion,
-    cancelProductSelection,
-    onTextareaFocus,
-    onTextareaBlur,
-    searchProductTextarea,
     unitFiltered,
     searchUnit,
+    // Modal de productos
+    showProductModal,
+    productSearchInput,
+    productSearchResults,
+    productSearchLoading,
+    searchProduct,
+    openProductModal,
+    selectProductSuggestionInModal,
+    unlockDescription,
     formatCurrency,
     getCategorySubtotal,
     totalGeneral,

@@ -10,7 +10,6 @@ import TabPanel from 'primevue/tabpanel'
 import Autocomplete from 'primevue/autocomplete'
 import { useCreateQuote } from '@/composables/useQuotes'
 import { useRouter } from 'vue-router'
-import { watch, ref } from 'vue'
 import Dialog from 'primevue/dialog'
 
 const {
@@ -41,17 +40,21 @@ const {
   // Product autocomplete
   descriptionInputs,
   descriptionLocked,
-  productSuggestions,
-  showProductDropdown,
   onTextareaInput,
-  onTextareaFocus,
-  onTextareaBlur,
-  selectProductSuggestion,
-  cancelProductSelection,
 
   // Unit autocomplete
   unitFiltered,
   searchUnit,
+
+  // Modal de productos
+  showProductModal,
+  productSearchInput,
+  productSearchResults,
+  productSearchLoading,
+  searchProduct,
+  openProductModal,
+  selectProductSuggestionInModal,
+  unlockDescription,
 
   // Form validation and submission
   errors,
@@ -69,51 +72,8 @@ const {
 
 const router = useRouter()
 
-const showProductModal = ref(false)
-const productSearchInput = ref('')
-const productSearchResults = ref<any[]>([])
-const productSearchLoading = ref(false)
-const selectedProductIdx = ref<number | null>(null)
-
 function goBack() {
   router.push('/quotes')
-}
-
-watch(showClientDropdown, (val) => {
-  console.log('showClientDropdown:', val)
-})
-
-async function searchProduct() {
-  productSearchLoading.value = true
-  // Simula búsqueda, reemplaza con tu API real
-  const res = await fetch(
-    `${import.meta.env.VITE_API_URL}/product/suggestions?description=${encodeURIComponent(productSearchInput.value)}`,
-  )
-  if (res.ok) {
-    productSearchResults.value = await res.json()
-  } else {
-    productSearchResults.value = []
-  }
-  productSearchLoading.value = false
-}
-
-function openProductModal(idx: number) {
-  selectedProductIdx.value = idx
-  productSearchInput.value = ''
-  productSearchResults.value = []
-  showProductModal.value = true
-}
-
-function selectProductSuggestionInModal(suggestion: any) {
-  if (selectedProductIdx.value !== null) {
-    descriptionInputs.value[selectedProductIdx.value] = suggestion.description
-    descriptionLocked.value[selectedProductIdx.value] = true
-  }
-  showProductModal.value = false
-}
-
-function unlockDescription(idx: number) {
-  descriptionLocked.value[idx] = false
 }
 </script>
 
@@ -290,7 +250,9 @@ function unlockDescription(idx: number) {
                   >
                 </div>
                 <div class="flex flex-col items-start mb-2 pt-6">
-                  <label class="block text-surface-700 dark:text-surface-200">Category</label>
+                  <label class="block text-surface-700 dark:text-surface-200"
+                    >Category (optional)</label
+                  >
                   <InputText
                     v-model="categoryInputs[idx]"
                     class="max-w-xs w-full text-surface-900 dark:text-surface-0"
@@ -309,8 +271,6 @@ function unlockDescription(idx: number) {
                     placeholder="Type the full description..."
                     :disabled="descriptionLocked[idx]"
                     @input="(e: any) => onTextareaInput(e, idx)"
-                    @focus="() => onTextareaFocus(idx)"
-                    @blur="() => onTextareaBlur(idx)"
                   />
                   <div class="my-2 flex gap-2">
                     <button
@@ -360,7 +320,9 @@ function unlockDescription(idx: number) {
                     >
                   </div>
                   <div class="flex flex-col items-start">
-                    <label class="block text-surface-700 dark:text-surface-200">Price</label>
+                    <label class="block text-surface-700 dark:text-surface-200"
+                      >Price (optional)</label
+                    >
                     <InputNumber
                       v-model="item.price"
                       class="max-w-xs w-full text-surface-900 dark:text-surface-0"
@@ -369,15 +331,6 @@ function unlockDescription(idx: number) {
                       :minFractionDigits="2"
                       size="small"
                     />
-                    <span
-                      v-if="
-                        errors.itemsFields &&
-                        errors.itemsFields[idx] &&
-                        errors.itemsFields[idx].price
-                      "
-                      class="text-red-500 text-xs"
-                      >{{ errors.itemsFields[idx].price && 'Price is required (>0).' }}</span
-                    >
                   </div>
                   <div class="flex flex-col items-start">
                     <label class="block text-surface-700 dark:text-surface-200">Unit</label>
