@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -13,7 +13,6 @@ import config from '@/config'
 import axios from 'axios'
 import { formatCurrency } from '@/utils/common'
 import { useToast } from 'primevue/usetoast'
-import useQuotes from '@/composables/useQuotes'
 
 interface QuoteItem {
   id: number | string
@@ -41,21 +40,29 @@ interface Quote {
 }
 
 const router = useRouter()
-const toast = useToast()
-
-// Usar el composable
-const { quotes, search, selectedQuote } = useQuotes()
-
-// Variables locales necesarias
+const quotes = ref<Quote[]>([])
+const total = ref(0)
+const totalPages = ref(0)
+const page = ref(1)
+const limit = ref(5)
+const first = ref(0)
+const last = ref(0)
+const loading = ref(false)
+const hasNext = ref(false)
+const hasPrev = ref(false)
+const selectedQuote = ref<Quote | null>(null)
 const showDialog = ref(false)
+const searchTerm = ref('')
 const statusFilter = ref('')
 const priorityFilter = ref('')
 const showStatusCard = ref(false)
 const showPriorityCard = ref(false)
+const toast = useToast()
 const confirmDeleteDialog = ref(false)
 const quoteIdToDelete = ref<string | null>(null)
 
-// Opciones de filtro
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+
 const statusOptions = [
   { label: 'Todos', value: '' },
   { label: 'En Progreso', value: 'En Progreso' },
@@ -69,31 +76,37 @@ const priorityOptions = [
   { label: 'Baja', value: 'Baja' },
 ]
 
-// Filtros para PrimeVue DataTable
-const filters = ref({
-  id: { value: null, matchMode: 'contains' },
-  author: { value: null, matchMode: 'contains' },
-  'client.companyName': { value: null, matchMode: 'contains' },
-  status: { value: null, matchMode: 'equals' },
-  priority: { value: null, matchMode: 'equals' },
-  totalPrice: { value: null, matchMode: 'equals' },
-  createdAt: { value: null, matchMode: 'dateIs' },
-})
+async function fetchQuotes() {
+  loading.value = true
+  try {
+    const response = (
+      await axios.get(`${config.API_URL}/quote`, {
+        params: {
+          page: page.value,
+          limit: limit.value,
+          search: searchTerm.value,
+        },
+      })
+    ).data
 
-// Computed para verificar si hay filtros frontend activos
-const hasFrontendFilters = computed(() => {
-  return statusFilter.value || priorityFilter.value || search.value
-})
-
-// Mensaje cuando no hay resultados después de filtrar
-const noResultsMessage = computed(() => {
-  if (hasFrontendFilters.value && filteredQuotes.value.length === 0) {
-    return `No se encontraron cotizaciones con los filtros aplicados. ${quotes.value.length} cotizaciones en la página actual.`
+    // Forzar reactividad asignando un nuevo array
+    quotes.value = [...response.data]
+    total.value = response.total
+    totalPages.value = response.totalPages
+    page.value = response.page
+    limit.value = response.limit
+    first.value = (response.page - 1) * response.limit
+    last.value = Math.min(first.value + response.limit, response.total)
+    hasNext.value = response.hasNext
+    hasPrev.value = response.hasPrev
+  } catch (error) {
+    loading.value = false
+    console.log('Algo salió mal', error)
+  } finally {
+    loading.value = false
   }
-  return ''
-})
+}
 
-// Filtrado local
 const filteredQuotes = computed(() => {
   return quotes.value.filter((q) => {
     const statusMatch = !statusFilter.value || q.status === statusFilter.value
@@ -119,33 +132,87 @@ const groupedItems = computed(() => {
   return groups
 })
 
-// Funciones
+function onPageChange(event: any) {
+  first.value = event.first
+  page.value = Math.floor(event.first / event.rows) + 1
+  limit.value = event.rows
+  last.value = Math.min(first.value + limit.value, total.value)
+  fetchQuotes()
+}
+
+function goToFirstPage() {
+  if (page.value > 1) {
+    page.value = 1
+    first.value = 0
+    last.value = Math.min(limit.value, total.value)
+    fetchQuotes()
+  }
+}
+
+function goToPrevPage() {
+  if (page.value > 1) {
+    page.value--
+    first.value -= limit.value
+    last.value = Math.min(first.value + limit.value, total.value)
+    fetchQuotes()
+  }
+}
+
+function goToNextPage() {
+  if (page.value < totalPages.value) {
+    page.value++
+    first.value += limit.value
+    last.value = Math.min(first.value + limit.value, total.value)
+    fetchQuotes()
+  }
+}
+
+function goToLastPage() {
+  if (page.value < totalPages.value) {
+    page.value = totalPages.value
+    first.value = (totalPages.value - 1) * limit.value
+    last.value = total.value
+    fetchQuotes()
+  }
+}
+
+function onLimitChange() {
+  page.value = 1
+  first.value = 0
+  last.value = Math.min(limit.value, total.value)
+  fetchQuotes()
+}
+
 function showDetails(quote: Quote) {
   selectedQuote.value = quote
   showDialog.value = true
 }
 
-function clearAllFilters() {
-  // Limpiar búsqueda global
-  search.value = ''
-
-  // Limpiar filtros frontend
-  statusFilter.value = ''
-  priorityFilter.value = ''
-  showStatusCard.value = false
-  showPriorityCard.value = false
-
-  // Limpiar filtros de la tabla
-  filters.value = {
-    id: { value: null, matchMode: 'contains' },
-    author: { value: null, matchMode: 'contains' },
-    'client.companyName': { value: null, matchMode: 'contains' },
-    status: { value: null, matchMode: 'equals' },
-    priority: { value: null, matchMode: 'equals' },
-    totalPrice: { value: null, matchMode: 'equals' },
-    createdAt: { value: null, matchMode: 'dateIs' },
-  }
+function applyFilters() {
+  // Solo aplica búsqueda al backend, los filtros de estado y prioridad son frontend
+  page.value = 1
+  first.value = 0
+  last.value = Math.min(limit.value, total.value)
+  fetchQuotes()
 }
+
+watch(searchTerm, () => {
+  if (searchTimeout) clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    page.value = 1
+    first.value = 0
+    fetchQuotes()
+  }, 1000)
+})
+
+// Watchers para filtros frontend (no afectan la paginación)
+watch(statusFilter, () => {
+  // Solo filtrado local, no fetch
+})
+
+watch(priorityFilter, () => {
+  // Solo filtrado local, no fetch
+})
 
 function goToCreate() {
   router.push('/quotes/create')
@@ -200,6 +267,10 @@ function cancelDelete() {
   confirmDeleteDialog.value = false
   quoteIdToDelete.value = null
 }
+
+onMounted(() => {
+  fetchQuotes()
+})
 </script>
 
 <template>
@@ -212,10 +283,10 @@ function cancelDelete() {
             <div class="flex items-center gap-2">
               <span
                 class="inline-block px-2 py-1 rounded bg-primary text-white text-xs font-bold"
-                >{{ quotes.length }}</span
+                >{{ total }}</span
               >
               <span class="text-sm text-surface-600 dark:text-surface-400">
-                Cotizaciones cargadas
+                (Página {{ page }}/{{ totalPages }})
               </span>
             </div>
           </div>
@@ -299,18 +370,10 @@ function cancelDelete() {
             <!-- Buscador al final -->
             <div class="flex items-center gap-2">
               <InputText
-                v-model="search"
+                v-model="searchTerm"
                 placeholder="Buscar palabra clave..."
                 class="w-64 rounded-2xl border-0 focus:ring-1 focus:ring-primary/30 bg-transparent"
-              />
-              <Button
-                v-if="hasFrontendFilters"
-                icon="pi pi-times"
-                text
-                size="small"
-                @click="clearAllFilters"
-                v-tooltip.top="'Limpiar todos los filtros'"
-                class="text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
+                @keyup.enter="applyFilters"
               />
             </div>
           </div>
@@ -318,29 +381,65 @@ function cancelDelete() {
 
         <!-- Tabla de cotizaciones -->
         <div class="p-4 rounded-3xl border border-surface-200 dark:border-surface-800">
-          <!-- Mensaje cuando no hay resultados después de filtrar -->
-          <div
-            v-if="noResultsMessage"
-            class="mb-4 p-4 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-xl"
-          >
-            <div class="flex items-center gap-2">
-              <i class="pi pi-exclamation-triangle text-warning-600 dark:text-warning-400"></i>
-              <span class="text-warning-800 dark:text-warning-200 text-sm">{{
-                noResultsMessage
-              }}</span>
-            </div>
-          </div>
-
           <DataTable
             scrollable
             stripedRows
             scrollDirection="horizontal"
             :value="filteredQuotes"
-            :filters="filters"
+            :loading="loading"
             class="whitespace-nowrap"
-            :showGridlines="false"
-            :border-0="true"
           >
+            <template #paginatorstart>
+              <div class="flex items-center gap-2">
+                <Button
+                  type="button"
+                  icon="pi pi-angle-double-left"
+                  text
+                  :disabled="page === 1"
+                  @click="goToFirstPage"
+                />
+                <Button
+                  type="button"
+                  icon="pi pi-angle-left"
+                  text
+                  :disabled="page === 1"
+                  @click="goToPrevPage"
+                />
+                <span class="text-sm text-surface-600 dark:text-surface-400">
+                  Página {{ page }} de {{ totalPages }}
+                </span>
+                <Button
+                  type="button"
+                  icon="pi pi-angle-right"
+                  text
+                  :disabled="page === totalPages"
+                  @click="goToNextPage"
+                />
+                <Button
+                  type="button"
+                  icon="pi pi-angle-double-right"
+                  text
+                  :disabled="page === totalPages"
+                  @click="goToLastPage"
+                />
+              </div>
+            </template>
+            <template #paginatorend>
+              <div class="flex items-center gap-2">
+                <span class="text-sm text-surface-600 dark:text-surface-400">
+                  Filas por página:
+                </span>
+                <Dropdown
+                  v-model="limit"
+                  :options="[5, 10, 20, 50]"
+                  class="w-32"
+                  @change="onLimitChange"
+                />
+                <span class="text-sm text-surface-600 dark:text-surface-400">
+                  {{ first + 1 }} a {{ last }} de {{ total }}
+                </span>
+              </div>
+            </template>
             <Column header="Acciones" style="width: 100px">
               <template #body="{ data }">
                 <div class="flex gap-2">
@@ -446,6 +545,58 @@ function cancelDelete() {
               </template>
             </Column>
           </DataTable>
+
+          <!-- Paginación manual -->
+          <div class="mt-4 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <Button
+                type="button"
+                icon="pi pi-angle-double-left"
+                text
+                :disabled="page === 1"
+                @click="goToFirstPage"
+              />
+              <Button
+                type="button"
+                icon="pi pi-angle-left"
+                text
+                :disabled="page === 1"
+                @click="goToPrevPage"
+              />
+              <span class="text-sm text-surface-600 dark:text-surface-400">
+                Página {{ page }} de {{ totalPages }}
+              </span>
+              <Button
+                type="button"
+                icon="pi pi-angle-right"
+                text
+                :disabled="page === totalPages"
+                @click="goToNextPage"
+              />
+              <Button
+                type="button"
+                icon="pi pi-angle-double-right"
+                text
+                :disabled="page === totalPages"
+                @click="goToLastPage"
+              />
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-surface-600 dark:text-surface-400">
+                Filas por página:
+              </span>
+              <Dropdown
+                v-model="limit"
+                :options="[5, 10, 20, 50]"
+                class="w-32"
+                @change="onLimitChange"
+              />
+              <span class="text-sm text-surface-600 dark:text-surface-400">
+                {{ first + 1 }} a {{ last }} de {{ total }}
+              </span>
+            </div>
+          </div>
         </div>
       </template>
     </Card>

@@ -21,6 +21,7 @@ declare module 'vue' {
     Dropdown: typeof import('primevue/dropdown')['default']
     IconField: typeof import('primevue/iconfield')['default']
     InputIcon: typeof import('primevue/inputicon')['default']
+    Menu: typeof import('primevue/menu')['default']
     QuotesOverviewWidget: typeof import('./src/components/dashboard/QuotesOverviewWidget.vue')['default']
     QuotesTableView: typeof import('./src/components/quotes/QuotesTableView.vue')['default']
     QuotesView: typeof import('./src/components/quotes/QuotesView.vue')['default']
