@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
@@ -8,10 +8,12 @@ import Dialog from 'primevue/dialog'
 import Card from 'primevue/card'
 import InputText from 'primevue/inputtext'
 import Dropdown from 'primevue/dropdown'
+import Tag from 'primevue/tag'
 import config from '@/config'
 import axios from 'axios'
 import { formatCurrency } from '@/utils/common'
 import { useToast } from 'primevue/usetoast'
+import useQuotes from '@/composables/useQuotes'
 
 interface QuoteItem {
   id: number | string
@@ -39,29 +41,21 @@ interface Quote {
 }
 
 const router = useRouter()
-const quotes = ref<Quote[]>([])
-const total = ref(0)
-const totalPages = ref(0)
-const page = ref(1)
-const limit = ref(5)
-const first = ref(0)
-const last = ref(0)
-const loading = ref(false)
-const hasNext = ref(false)
-const hasPrev = ref(false)
-const selectedQuote = ref<Quote | null>(null)
+const toast = useToast()
+
+// Usar el composable
+const { quotes, search, selectedQuote } = useQuotes()
+
+// Variables locales necesarias
 const showDialog = ref(false)
-const searchTerm = ref('')
 const statusFilter = ref('')
 const priorityFilter = ref('')
 const showStatusCard = ref(false)
 const showPriorityCard = ref(false)
-const toast = useToast()
 const confirmDeleteDialog = ref(false)
 const quoteIdToDelete = ref<string | null>(null)
 
-let searchTimeout: ReturnType<typeof setTimeout> | null = null
-
+// Opciones de filtro
 const statusOptions = [
   { label: 'Todos', value: '' },
   { label: 'En Progreso', value: 'En Progreso' },
@@ -75,37 +69,31 @@ const priorityOptions = [
   { label: 'Baja', value: 'Baja' },
 ]
 
-async function fetchQuotes() {
-  loading.value = true
-  try {
-    const response = (
-      await axios.get(`${config.API_URL}/quote`, {
-        params: {
-          page: page.value,
-          limit: limit.value,
-          search: searchTerm.value,
-        },
-      })
-    ).data
+// Filtros para PrimeVue DataTable
+const filters = ref({
+  id: { value: null, matchMode: 'contains' },
+  author: { value: null, matchMode: 'contains' },
+  'client.companyName': { value: null, matchMode: 'contains' },
+  status: { value: null, matchMode: 'equals' },
+  priority: { value: null, matchMode: 'equals' },
+  totalPrice: { value: null, matchMode: 'equals' },
+  createdAt: { value: null, matchMode: 'dateIs' },
+})
 
-    // Forzar reactividad asignando un nuevo array
-    quotes.value = [...response.data]
-    total.value = response.total
-    totalPages.value = response.totalPages
-    page.value = response.page
-    limit.value = response.limit
-    first.value = (response.page - 1) * response.limit
-    last.value = Math.min(first.value + response.limit, response.total)
-    hasNext.value = response.hasNext
-    hasPrev.value = response.hasPrev
-  } catch (error) {
-    loading.value = false
-    console.log('Algo salió mal', error)
-  } finally {
-    loading.value = false
+// Computed para verificar si hay filtros frontend activos
+const hasFrontendFilters = computed(() => {
+  return statusFilter.value || priorityFilter.value || search.value
+})
+
+// Mensaje cuando no hay resultados después de filtrar
+const noResultsMessage = computed(() => {
+  if (hasFrontendFilters.value && filteredQuotes.value.length === 0) {
+    return `No se encontraron cotizaciones con los filtros aplicados. ${quotes.value.length} cotizaciones en la página actual.`
   }
-}
+  return ''
+})
 
+// Filtrado local
 const filteredQuotes = computed(() => {
   return quotes.value.filter((q) => {
     const statusMatch = !statusFilter.value || q.status === statusFilter.value
@@ -114,87 +102,50 @@ const filteredQuotes = computed(() => {
   })
 })
 
-function onPageChange(event: any) {
-  first.value = event.first
-  page.value = Math.floor(event.first / event.rows) + 1
-  limit.value = event.rows
-  last.value = Math.min(first.value + limit.value, total.value)
-  fetchQuotes()
-}
+// Agrupar items por categoría
+const groupedItems = computed(() => {
+  if (!selectedQuote.value) return {}
 
-function goToFirstPage() {
-  if (page.value > 1) {
-    page.value = 1
-    first.value = 0
-    last.value = Math.min(limit.value, total.value)
-    fetchQuotes()
-  }
-}
+  const groups: Record<string, QuoteItem[]> = {}
 
-function goToPrevPage() {
-  if (page.value > 1) {
-    page.value--
-    first.value -= limit.value
-    last.value = Math.min(first.value + limit.value, total.value)
-    fetchQuotes()
-  }
-}
+  selectedQuote.value.items.forEach((item: QuoteItem) => {
+    const category = item.category || 'Sin categoría'
+    if (!groups[category]) {
+      groups[category] = []
+    }
+    groups[category].push(item)
+  })
 
-function goToNextPage() {
-  if (page.value < totalPages.value) {
-    page.value++
-    first.value += limit.value
-    last.value = Math.min(first.value + limit.value, total.value)
-    fetchQuotes()
-  }
-}
+  return groups
+})
 
-function goToLastPage() {
-  if (page.value < totalPages.value) {
-    page.value = totalPages.value
-    first.value = (totalPages.value - 1) * limit.value
-    last.value = total.value
-    fetchQuotes()
-  }
-}
-
-function onLimitChange() {
-  page.value = 1
-  first.value = 0
-  last.value = Math.min(limit.value, total.value)
-  fetchQuotes()
-}
-
+// Funciones
 function showDetails(quote: Quote) {
   selectedQuote.value = quote
   showDialog.value = true
 }
 
-function applyFilters() {
-  // Solo aplica búsqueda al backend, los filtros de estado y prioridad son frontend
-  page.value = 1
-  first.value = 0
-  last.value = Math.min(limit.value, total.value)
-  fetchQuotes()
+function clearAllFilters() {
+  // Limpiar búsqueda global
+  search.value = ''
+
+  // Limpiar filtros frontend
+  statusFilter.value = ''
+  priorityFilter.value = ''
+  showStatusCard.value = false
+  showPriorityCard.value = false
+
+  // Limpiar filtros de la tabla
+  filters.value = {
+    id: { value: null, matchMode: 'contains' },
+    author: { value: null, matchMode: 'contains' },
+    'client.companyName': { value: null, matchMode: 'contains' },
+    status: { value: null, matchMode: 'equals' },
+    priority: { value: null, matchMode: 'equals' },
+    totalPrice: { value: null, matchMode: 'equals' },
+    createdAt: { value: null, matchMode: 'dateIs' },
+  }
 }
-
-watch(searchTerm, () => {
-  if (searchTimeout) clearTimeout(searchTimeout)
-  searchTimeout = setTimeout(() => {
-    page.value = 1
-    first.value = 0
-    fetchQuotes()
-  }, 1000)
-})
-
-// Watchers para filtros frontend (no afectan la paginación)
-watch(statusFilter, () => {
-  // Solo filtrado local, no fetch
-})
-
-watch(priorityFilter, () => {
-  // Solo filtrado local, no fetch
-})
 
 function goToCreate() {
   router.push('/quotes/create')
@@ -249,10 +200,6 @@ function cancelDelete() {
   confirmDeleteDialog.value = false
   quoteIdToDelete.value = null
 }
-
-onMounted(() => {
-  fetchQuotes()
-})
 </script>
 
 <template>
@@ -265,10 +212,10 @@ onMounted(() => {
             <div class="flex items-center gap-2">
               <span
                 class="inline-block px-2 py-1 rounded bg-primary text-white text-xs font-bold"
-                >{{ total }}</span
+                >{{ quotes.length }}</span
               >
               <span class="text-sm text-surface-600 dark:text-surface-400">
-                (Página {{ page }}/{{ totalPages }})
+                Cotizaciones cargadas
               </span>
             </div>
           </div>
@@ -352,10 +299,18 @@ onMounted(() => {
             <!-- Buscador al final -->
             <div class="flex items-center gap-2">
               <InputText
-                v-model="searchTerm"
+                v-model="search"
                 placeholder="Buscar palabra clave..."
                 class="w-64 rounded-2xl border-0 focus:ring-1 focus:ring-primary/30 bg-transparent"
-                @keyup.enter="applyFilters"
+              />
+              <Button
+                v-if="hasFrontendFilters"
+                icon="pi pi-times"
+                text
+                size="small"
+                @click="clearAllFilters"
+                v-tooltip.top="'Limpiar todos los filtros'"
+                class="text-surface-500 hover:text-surface-700 dark:hover:text-surface-300"
               />
             </div>
           </div>
@@ -363,65 +318,29 @@ onMounted(() => {
 
         <!-- Tabla de cotizaciones -->
         <div class="p-4 rounded-3xl border border-surface-200 dark:border-surface-800">
+          <!-- Mensaje cuando no hay resultados después de filtrar -->
+          <div
+            v-if="noResultsMessage"
+            class="mb-4 p-4 bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 rounded-xl"
+          >
+            <div class="flex items-center gap-2">
+              <i class="pi pi-exclamation-triangle text-warning-600 dark:text-warning-400"></i>
+              <span class="text-warning-800 dark:text-warning-200 text-sm">{{
+                noResultsMessage
+              }}</span>
+            </div>
+          </div>
+
           <DataTable
             scrollable
             stripedRows
             scrollDirection="horizontal"
             :value="filteredQuotes"
-            :loading="loading"
+            :filters="filters"
             class="whitespace-nowrap"
+            :showGridlines="false"
+            :border-0="true"
           >
-            <template #paginatorstart>
-              <div class="flex items-center gap-2">
-                <Button
-                  type="button"
-                  icon="pi pi-angle-double-left"
-                  text
-                  :disabled="page === 1"
-                  @click="goToFirstPage"
-                />
-                <Button
-                  type="button"
-                  icon="pi pi-angle-left"
-                  text
-                  :disabled="page === 1"
-                  @click="goToPrevPage"
-                />
-                <span class="text-sm text-surface-600 dark:text-surface-400">
-                  Página {{ page }} de {{ totalPages }}
-                </span>
-                <Button
-                  type="button"
-                  icon="pi pi-angle-right"
-                  text
-                  :disabled="page === totalPages"
-                  @click="goToNextPage"
-                />
-                <Button
-                  type="button"
-                  icon="pi pi-angle-double-right"
-                  text
-                  :disabled="page === totalPages"
-                  @click="goToLastPage"
-                />
-              </div>
-            </template>
-            <template #paginatorend>
-              <div class="flex items-center gap-2">
-                <span class="text-sm text-surface-600 dark:text-surface-400">
-                  Filas por página:
-                </span>
-                <Dropdown
-                  v-model="limit"
-                  :options="[5, 10, 20, 50]"
-                  class="w-32"
-                  @change="onLimitChange"
-                />
-                <span class="text-sm text-surface-600 dark:text-surface-400">
-                  {{ first + 1 }} a {{ last }} de {{ total }}
-                </span>
-              </div>
-            </template>
             <Column header="Acciones" style="width: 100px">
               <template #body="{ data }">
                 <div class="flex gap-2">
@@ -496,21 +415,9 @@ onMounted(() => {
 
             <Column field="priority" header="Prioridad" sortable style="width: 120px">
               <template #body="{ data }">
-                <span
-                  v-if="data.priority === 'Alta'"
-                  class="inline-block px-2 py-1 rounded bg-primary text-primary-contrast text-xs font-bold"
-                  >Alta</span
-                >
-                <span
-                  v-else-if="data.priority === 'Normal'"
-                  class="inline-block px-2 py-1 rounded bg-secondary text-secondary-contrast text-xs font-bold"
-                  >Normal</span
-                >
-                <span
-                  v-else-if="data.priority === 'Baja'"
-                  class="inline-block px-2 py-1 rounded bg-success text-success-contrast text-xs font-bold"
-                  >Baja</span
-                >
+                <Tag v-if="data.priority === 'Alta'" value="Alta" severity="danger" />
+                <Tag v-else-if="data.priority === 'Normal'" value="Normal" severity="warning" />
+                <Tag v-else-if="data.priority === 'Baja'" value="Baja" severity="success" />
               </template>
             </Column>
 
@@ -524,16 +431,8 @@ onMounted(() => {
 
             <Column field="status" header="Estado" sortable style="width: 120px">
               <template #body="{ data }">
-                <span
-                  v-if="data.status === 'En Progreso'"
-                  class="inline-block px-2 py-1 rounded bg-primary text-primary-contrast text-xs font-bold"
-                  >En Progreso</span
-                >
-                <span
-                  v-else-if="data.status === 'Aprobada'"
-                  class="inline-block px-2 py-1 rounded bg-success text-success-contrast text-xs font-bold"
-                  >Aprobada</span
-                >
+                <Tag v-if="data.status === 'En Progreso'" value="En Progreso" severity="info" />
+                <Tag v-else-if="data.status === 'Aprobada'" value="Aprobada" severity="success" />
               </template>
             </Column>
 
@@ -547,58 +446,6 @@ onMounted(() => {
               </template>
             </Column>
           </DataTable>
-
-          <!-- Paginación manual -->
-          <div class="mt-4 flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <Button
-                type="button"
-                icon="pi pi-angle-double-left"
-                text
-                :disabled="page === 1"
-                @click="goToFirstPage"
-              />
-              <Button
-                type="button"
-                icon="pi pi-angle-left"
-                text
-                :disabled="page === 1"
-                @click="goToPrevPage"
-              />
-              <span class="text-sm text-surface-600 dark:text-surface-400">
-                Página {{ page }} de {{ totalPages }}
-              </span>
-              <Button
-                type="button"
-                icon="pi pi-angle-right"
-                text
-                :disabled="page === totalPages"
-                @click="goToNextPage"
-              />
-              <Button
-                type="button"
-                icon="pi pi-angle-double-right"
-                text
-                :disabled="page === totalPages"
-                @click="goToLastPage"
-              />
-            </div>
-
-            <div class="flex items-center gap-2">
-              <span class="text-sm text-surface-600 dark:text-surface-400">
-                Filas por página:
-              </span>
-              <Dropdown
-                v-model="limit"
-                :options="[5, 10, 20, 50]"
-                class="w-32"
-                @change="onLimitChange"
-              />
-              <span class="text-sm text-surface-600 dark:text-surface-400">
-                {{ first + 1 }} a {{ last }} de {{ total }}
-              </span>
-            </div>
-          </div>
         </div>
       </template>
     </Card>
@@ -638,22 +485,22 @@ onMounted(() => {
               </div>
               <div class="flex flex-col *:w-fit">
                 <label class="text-sm font-medium text-surface-600">Estado:</label>
-                <span
+                <Tag
                   v-if="selectedQuote.status === 'En Progreso'"
-                  class="inline-block px-2 py-1 rounded bg-primary text-primary-contrast text-xs font-bold"
-                  >En Progreso</span
-                >
-                <span
+                  value="En Progreso"
+                  severity="info"
+                />
+                <Tag
                   v-else-if="selectedQuote.status === 'Aprobada'"
-                  class="inline-block px-2 py-1 rounded bg-success text-success-contrast text-xs font-bold"
-                  >Aprobada</span
-                >
+                  value="Aprobada"
+                  severity="success"
+                />
               </div>
             </div>
           </template>
         </Card>
 
-        <!-- Items de la cotización -->
+        <!-- Items de la cotización organizados por categoría -->
         <Card class="rounded-3xl border-0 shadow-none">
           <template #title>
             <div class="flex items-center gap-2">
@@ -662,65 +509,86 @@ onMounted(() => {
             </div>
           </template>
           <template #content>
-            <div class="overflow-x-auto">
-              <DataTable
-                :value="selectedQuote.items"
-                responsiveLayout="scroll"
-                stripedRows
-                scrollable
-                scrollHeight="300px"
-                scrollDirection="both"
-                class="min-w-full"
-              >
-                <Column field="id" header="ID" style="width: 80px">
-                  <template #body="{ data }">
-                    <span
-                      class="inline-block px-2 py-1 rounded bg-primary text-primary-contrast text-xs font-bold"
-                      >{{ data.id }}</span
-                    >
-                  </template>
-                </Column>
-                <Column field="product.description" header="Descripción" style="min-width: 200px">
-                  <template #body="{ data }">
-                    <div class="flex flex-col">
-                      <span class="font-medium">{{ data.product.description }}</span>
-                      <span class="text-sm text-surface-500">Unidad: {{ data.product.unit }}</span>
-                    </div>
-                  </template>
-                </Column>
-                <Column field="category" header="Categoría" sortable style="width: 150px">
-                  <template #body="{ data }">
-                    <span
-                      class="inline-block px-2 py-1 rounded bg-primary text-primary-contrast text-xs font-bold"
-                      >{{ data.category }}</span
-                    >
-                  </template>
-                </Column>
-                <Column field="quantity" header="Cantidad" sortable style="width: 100px">
-                  <template #body="{ data }">
-                    <span
-                      class="inline-block px-2 py-1 rounded bg-primary text-primary-contrast text-xs font-bold"
-                      >{{ data.quantity }}</span
-                    >
-                  </template>
-                </Column>
-                <Column field="price" header="Precio" sortable style="width: 120px">
-                  <template #body="{ data }">
-                    <span class="font-bold text-primary">
-                      {{ formatCurrency(data.price, selectedQuote.currency) }}
+            <div class="space-y-6">
+              <div v-for="(items, category) in groupedItems" :key="category" class="space-y-4">
+                <!-- Header de categoría -->
+                <div
+                  class="flex items-center justify-between border-b border-surface-200 dark:border-surface-700 pb-2"
+                >
+                  <div class="flex items-center gap-3">
+                    <Tag :value="category" severity="primary" />
+                    <span class="text-sm text-surface-600 dark:text-surface-400">
+                      {{ items.length }} item{{ items.length > 1 ? 's' : '' }}
                     </span>
-                  </template>
-                </Column>
-                <Column header="Subtotal" style="width: 120px">
-                  <template #body="{ data }">
-                    <span class="font-bold text-success">
-                      {{
-                        formatCurrency(Number(data.price) * data.quantity, selectedQuote.currency)
-                      }}
-                    </span>
-                  </template>
-                </Column>
-              </DataTable>
+                  </div>
+                  <div class="text-sm font-medium text-surface-600 dark:text-surface-400">
+                    Subtotal:
+                    {{
+                      formatCurrency(
+                        items.reduce((sum, item) => sum + Number(item.price) * item.quantity, 0),
+                        selectedQuote.currency,
+                      )
+                    }}
+                  </div>
+                </div>
+
+                <!-- Tabla de items de esta categoría -->
+                <div class="overflow-x-auto">
+                  <DataTable
+                    :value="items"
+                    responsiveLayout="scroll"
+                    stripedRows
+                    scrollable
+                    scrollDirection="horizontal"
+                    class="min-w-full"
+                    :showGridlines="false"
+                  >
+                    <Column field="id" header="ID" style="width: 80px">
+                      <template #body="{ data }">
+                        <Tag :value="data.id.toString()" severity="secondary" />
+                      </template>
+                    </Column>
+                    <Column
+                      field="product.description"
+                      header="Descripción"
+                      style="min-width: 200px"
+                    >
+                      <template #body="{ data }">
+                        <div class="flex flex-col">
+                          <span class="font-medium">{{ data.product.description }}</span>
+                          <span class="text-sm text-surface-500"
+                            >Unidad: {{ data.product.unit }}</span
+                          >
+                        </div>
+                      </template>
+                    </Column>
+                    <Column field="quantity" header="Cantidad" sortable style="width: 100px">
+                      <template #body="{ data }">
+                        <Tag :value="data.quantity.toString()" severity="info" />
+                      </template>
+                    </Column>
+                    <Column field="price" header="Precio" sortable style="width: 120px">
+                      <template #body="{ data }">
+                        <span class="font-bold text-primary">
+                          {{ formatCurrency(data.price, selectedQuote.currency) }}
+                        </span>
+                      </template>
+                    </Column>
+                    <Column header="Subtotal" style="width: 120px">
+                      <template #body="{ data }">
+                        <span class="font-bold text-success">
+                          {{
+                            formatCurrency(
+                              Number(data.price) * data.quantity,
+                              selectedQuote.currency,
+                            )
+                          }}
+                        </span>
+                      </template>
+                    </Column>
+                  </DataTable>
+                </div>
+              </div>
             </div>
           </template>
         </Card>
